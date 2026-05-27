@@ -1,0 +1,15 @@
+spring:
+  application:
+    name: app-med
+  datasource:
+    url: jdbc:postgresql://localhost:5432/medscan_db
+    username: postgres
+    password: 12345_Caro
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect

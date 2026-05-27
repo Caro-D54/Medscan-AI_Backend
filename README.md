@@ -1,4 +1,4 @@
-# Pharmacs_Backend
+# MedScan AI- Backend
 
 ---
 
