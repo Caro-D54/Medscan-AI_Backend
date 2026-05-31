@@ -1,7 +1,9 @@
 package com.medscan.app_med.controller;
 
 import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @Controller
 public class HomeController {
@@ -18,3 +20,4 @@ public class HomeController {
         return "user"; // Busca templates/user.html
     }
 }
+
