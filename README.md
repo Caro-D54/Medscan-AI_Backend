@@ -13,14 +13,14 @@ Este repositorio contiene el núcleo lógico y el motor de datos de **MedScan AI
 
 | Componente | Tecnología |
 | --- | --- |
-| **Lenguaje** | Java 17+ |
+| **Lenguaje** | Java 25+ |
 | **Framework** | Spring Boot 3.x |
 | **Base de Datos** | PostgreSQL 18+ |
 | **Gestión de Dependencias** | Maven |
 
 ## ⚙️ Configuración e Instalación
 
-1. **Requisitos:** Tener instalado el JDK 17 y PostgreSQL.
+1. **Requisitos:** Tener instalado el JDK 25 y PostgreSQL.
 2. **Base de Datos:** Crea una base de datos llamada `medscan_db`.
 3. **Configuración:** Actualiza el archivo `src/main/resources/application.yaml` (o `.properties`) con tus credenciales locales.
 4. **Ejecución:**
