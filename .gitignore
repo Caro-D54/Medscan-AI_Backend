@@ -31,3 +31,8 @@ build/
 
 ### VS Code ###
 .vscode/
+*.code-workspace
+
+### Repositories externos ###
+/MedScan/
+/Medscan-Mobile/
