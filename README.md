@@ -6,7 +6,7 @@ Este repositorio contiene el núcleo lógico y el motor de datos de **MedScan AI
 
 * **Arquitectura:** Clean Architecture con separación de capas (`controller`, `service`, `repository`, `model`).
 * **Persistencia:** Integración nativa con PostgreSQL mediante Spring Data JPA.
-* **Seguridad:** Configuración de CORS para permitir peticiones desde clientes móviles (Expo).
+* **Seguridad:** Configuración de CORS para permitir integraciones de clientes externos.
 * **Gestión de Entidades:** Automatización de esquema de base de datos a través de Hibernate.
 
 ## 🛠️ Stack Tecnológico
