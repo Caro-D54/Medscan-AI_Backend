@@ -35,3 +35,9 @@ build/
 
 ### Environment ###
 .env
+.env.*
+!.env.example
+
+### Configuración local sensible ###
+application-dev.yaml
+application-dev.yml
