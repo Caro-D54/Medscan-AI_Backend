@@ -7,8 +7,11 @@ import com.medscan.app_med.service.DuplicateEmailException;
 import com.medscan.app_med.service.InvalidCredentialsException;
 import com.medscan.app_med.service.RegisterRequest;
 import com.medscan.app_med.service.LoginRequest;
+import com.medscan.app_med.security.JwtService;
+import com.medscan.app_med.repository.UserRepo;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
@@ -23,6 +26,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(AuthController.class)
+@AutoConfigureMockMvc(addFilters = false)
 @Import(GlobalExceptionHandler.class)
 class AuthControllerTest {
 
@@ -34,6 +38,12 @@ class AuthControllerTest {
 
     @MockBean
     private AuthService authService;
+
+    @MockBean
+    private JwtService jwtService;
+
+    @MockBean
+    private UserRepo userRepo;
 
     @Test
     void registerReturns201AndToken() throws Exception {

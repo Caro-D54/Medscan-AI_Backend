@@ -2,6 +2,7 @@ package com.medscan.app_med.controller;
 
 import com.medscan.app_med.service.DuplicateEmailException;
 import com.medscan.app_med.service.InvalidCredentialsException;
+import com.medscan.app_med.service.MedicationNotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -24,5 +25,10 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Void> handleValidation(MethodArgumentNotValidException ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
+    }
+
+    @ExceptionHandler(MedicationNotFoundException.class)
+    public ResponseEntity<Void> handleMedicationNotFound(MedicationNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
     }
 }
