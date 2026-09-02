@@ -1,11 +1,8 @@
 spring:
   application:
     name: app-med
-  datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/medscan_db}
-    username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:postgres}
-    driver-class-name: org.postgresql.Driver
+  profiles:
+    active: dev
   jpa:
     hibernate:
       ddl-auto: update
@@ -13,3 +10,14 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+
+server:
+  port: 8080
+
+app:
+  jwt:
+    secret: ${JWT_SECRET}
+    expiration-ms: ${JWT_EXPIRATION_MS:86400000}
