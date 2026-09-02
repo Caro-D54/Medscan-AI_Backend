@@ -3,6 +3,9 @@ package com.medscan.app_med.controller;
 import com.medscan.app_med.model.Medicament;
 import com.medscan.app_med.service.MedicationService;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -15,8 +18,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.List;
-
 @RestController
 @RequestMapping("/api/v1/medications")
 public class MedicamentController {
@@ -28,8 +29,10 @@ public class MedicamentController {
     }
 
     @GetMapping
-    public List<Medicament> getMedications(@RequestParam(required = false) String name) {
-        return medicationService.getMedications(name);
+    public Page<Medicament> getMedications(@RequestParam(required = false) String name,
+                                           @RequestParam(defaultValue = "0") int page,
+                                           @RequestParam(defaultValue = "20") int size) {
+        return medicationService.getMedications(name, PageRequest.of(page, size, Sort.by(Sort.Direction.ASC, "id")));
     }
 
     @PostMapping

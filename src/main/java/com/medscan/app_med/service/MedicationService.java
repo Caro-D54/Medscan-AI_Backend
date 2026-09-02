@@ -3,11 +3,11 @@ package com.medscan.app_med.service;
 import com.medscan.app_med.model.Medicament;
 import com.medscan.app_med.model.User;
 import com.medscan.app_med.repository.MedicamentRepo;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
-
-import java.util.List;
 
 @Service
 public class MedicationService {
@@ -18,12 +18,12 @@ public class MedicationService {
         this.medicamentRepo = medicamentRepo;
     }
 
-    public List<Medicament> getMedications(String nameFilter) {
+    public Page<Medicament> getMedications(String nameFilter, Pageable pageable) {
         User user = currentUser();
         if (nameFilter == null || nameFilter.isBlank()) {
-            return medicamentRepo.findByUserOrderByIdAsc(user);
+            return medicamentRepo.findByUser(user, pageable);
         }
-        return medicamentRepo.findByUserAndNameContainingIgnoreCaseOrderByIdAsc(user, nameFilter.trim());
+        return medicamentRepo.findByUserAndNameContainingIgnoreCase(user, nameFilter.trim(), pageable);
     }
 
     public Medicament createMedication(Medicament medicament) {

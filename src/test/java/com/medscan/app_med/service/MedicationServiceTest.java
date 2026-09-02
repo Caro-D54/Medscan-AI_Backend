@@ -12,6 +12,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 import java.util.Optional;
@@ -50,25 +54,27 @@ class MedicationServiceTest {
 
     @Test
     void getMedicationsWithoutFilterReturnsAllForCurrentUser() {
-        List<Medicament> meds = List.of(new Medicament());
-        when(medicamentRepo.findByUserOrderByIdAsc(currentUser)).thenReturn(meds);
+        Page<Medicament> meds = new PageImpl<>(List.of(new Medicament()));
+        Pageable pageable = PageRequest.of(0, 20);
+        when(medicamentRepo.findByUser(currentUser, pageable)).thenReturn(meds);
 
-        List<Medicament> result = medicationService.getMedications(null);
+        Page<Medicament> result = medicationService.getMedications(null, pageable);
 
         assertThat(result).isSameAs(meds);
-        verify(medicamentRepo).findByUserOrderByIdAsc(currentUser);
+        verify(medicamentRepo).findByUser(currentUser, pageable);
     }
 
     @Test
     void getMedicationsWithNameFilterUsesContainsQuery() {
-        List<Medicament> meds = List.of(new Medicament());
-        when(medicamentRepo.findByUserAndNameContainingIgnoreCaseOrderByIdAsc(currentUser, "amo"))
+        Page<Medicament> meds = new PageImpl<>(List.of(new Medicament()));
+        Pageable pageable = PageRequest.of(1, 10);
+        when(medicamentRepo.findByUserAndNameContainingIgnoreCase(currentUser, "amo", pageable))
                 .thenReturn(meds);
 
-        List<Medicament> result = medicationService.getMedications("amo");
+        Page<Medicament> result = medicationService.getMedications("amo", pageable);
 
         assertThat(result).isSameAs(meds);
-        verify(medicamentRepo).findByUserAndNameContainingIgnoreCaseOrderByIdAsc(currentUser, "amo");
+        verify(medicamentRepo).findByUserAndNameContainingIgnoreCase(currentUser, "amo", pageable);
     }
 
     @Test

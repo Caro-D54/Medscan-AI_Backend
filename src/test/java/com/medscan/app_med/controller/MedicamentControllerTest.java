@@ -14,6 +14,9 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -23,6 +26,7 @@ import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -67,25 +71,30 @@ class MedicamentControllerTest {
     }
 
     @Test
-    void getMedicationsReturnsList() throws Exception {
+    void getMedicationsReturnsPage() throws Exception {
         Medicament med = new Medicament();
         med.setId(1L);
         med.setName("Acetaminophen");
-        when(medicationService.getMedications(null)).thenReturn(List.of(med));
+        Page<Medicament> page = new PageImpl<>(List.of(med));
+        when(medicationService.getMedications(isNull(), any(Pageable.class))).thenReturn(page);
 
         mockMvc.perform(get("/api/v1/medications"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].name").value("Acetaminophen"));
+                .andExpect(jsonPath("$.content[0].name").value("Acetaminophen"));
     }
 
     @Test
-    void getMedicationsWithNameFilterDelegatesFilter() throws Exception {
-        when(medicationService.getMedications("amo")).thenReturn(List.of());
+    void getMedicationsWithNameFilterAndPagingParams() throws Exception {
+        Page<Medicament> page = new PageImpl<>(List.of());
+        when(medicationService.getMedications(eq("amo"), any(Pageable.class))).thenReturn(page);
 
-        mockMvc.perform(get("/api/v1/medications").param("name", "amo"))
+        mockMvc.perform(get("/api/v1/medications")
+                        .param("name", "amo")
+                        .param("page", "1")
+                        .param("size", "10"))
                 .andExpect(status().isOk());
 
-        verify(medicationService).getMedications("amo");
+        verify(medicationService).getMedications(eq("amo"), any(Pageable.class));
     }
 
     @Test
