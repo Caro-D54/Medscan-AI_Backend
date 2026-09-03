@@ -38,3 +38,6 @@ La API se configura mediante variables de entorno referenciadas desde `applicati
 | `SPRING_DATASOURCE_PASSWORD` | Contraseña de la base de datos | `change_me` |
 | `JWT_SECRET` | Clave secreta para firmar los tokens JWT (mínimo 32 caracteres) | `clave_secreta_muy_larga_de_al_menos_32_caracteres` |
 | `JWT_EXPIRATION_MS` | Tiempo de expiración del token JWT en milisegundos | `86400000` (24 h) |
+| `SCAN_OPENAI_API_KEY` | API key de OpenAI para el servicio de escaneo de recetas/prospectos | `sk-...` |
+| `SCAN_OPENAI_MODEL` | Modelo de OpenAI usado para el escaneo (opcional) | `gpt-4o-mini` |
+| `SCAN_OPENAI_URL` | Endpoint de OpenAI Chat Completions (opcional) | `https://api.openai.com/v1/chat/completions` |

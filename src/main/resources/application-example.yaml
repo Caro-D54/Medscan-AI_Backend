@@ -23,3 +23,8 @@ app:
   jwt:
     secret: ${JWT_SECRET:change_me_jwt_secret_at_least_32_chars}
     expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+  scan:
+    openai:
+      api-key: ${SCAN_OPENAI_API_KEY:}
+      model: ${SCAN_OPENAI_MODEL:gpt-4o-mini}
+      url: ${SCAN_OPENAI_URL:https://api.openai.com/v1/chat/completions}
