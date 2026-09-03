@@ -41,3 +41,6 @@ La API se configura mediante variables de entorno referenciadas desde `applicati
 | `SCAN_OPENAI_API_KEY` | API key de OpenAI para el servicio de escaneo de recetas/prospectos | `sk-...` |
 | `SCAN_OPENAI_MODEL` | Modelo de OpenAI usado para el escaneo (opcional) | `gpt-4o-mini` |
 | `SCAN_OPENAI_URL` | Endpoint de OpenAI Chat Completions (opcional) | `https://api.openai.com/v1/chat/completions` |
+| `NOTIFICATION_EXPO_URL` | Endpoint de Expo Push Notifications (opcional) | `https://exp.host/--/api/v2/push/send` |
+| `NOTIFICATION_REMINDER_DELAY_MS` | Intervalo en ms entre revisiones de dosis pendientes (opcional) | `60000` |
+| `NOTIFICATION_REMINDER_ADVANCE_MINUTES` | Minutos de antelación para avisar próximas tomas (opcional) | `10` |

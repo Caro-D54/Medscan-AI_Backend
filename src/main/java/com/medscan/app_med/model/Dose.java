@@ -37,4 +37,6 @@ public class Dose {
 
     @Enumerated(EnumType.STRING)
     private DoseStatus status;
+
+    private LocalDateTime notifiedAt;
 }

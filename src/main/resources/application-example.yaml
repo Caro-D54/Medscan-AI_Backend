@@ -28,3 +28,9 @@ app:
       api-key: ${SCAN_OPENAI_API_KEY:}
       model: ${SCAN_OPENAI_MODEL:gpt-4o-mini}
       url: ${SCAN_OPENAI_URL:https://api.openai.com/v1/chat/completions}
+  notification:
+    expo:
+      url: ${NOTIFICATION_EXPO_URL:https://exp.host/--/api/v2/push/send}
+    reminder:
+      delay-ms: ${NOTIFICATION_REMINDER_DELAY_MS:60000}
+      advance-minutes: ${NOTIFICATION_REMINDER_ADVANCE_MINUTES:10}
