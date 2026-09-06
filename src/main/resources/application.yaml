@@ -2,14 +2,15 @@ spring:
   application:
     name: app-med
   datasource:
-    url: jdbc:postgresql://localhost:5432/medscan_db
-    username: postgres
-    password: 12345_Caro
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/medscan_db}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
-      ddl-auto: update
-    show-sql: true
+      ddl-auto: ${JPA_DDL_AUTO:update}
+    show-sql: ${JPA_SHOW_SQL:false}
+    open-in-view: false
     properties:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect

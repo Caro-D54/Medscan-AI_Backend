@@ -1,28 +1,33 @@
 package com.medscan.app_med.controller;
 
+import com.medscan.app_med.dto.MedicamentRequest;
 import com.medscan.app_med.model.Medicament;
-import com.medscan.app_med.repository.MedicamentRepo;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.medscan.app_med.service.MedicamentService;
+import jakarta.validation.Valid;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-
 
 @RestController
 @RequestMapping("/api/v1/medicaments")
 public class MedicamentController {
-    @Autowired 
-    private MedicamentRepo medicamentRepo;
+
+    private final MedicamentService medicamentService;
+
+    public MedicamentController(MedicamentService medicamentService) {
+        this.medicamentService = medicamentService;
+    }
 
     @GetMapping
-    public List<Medicament> getAllMedicaments() {
-        return medicamentRepo.findAll();
+    public Page<Medicament> getAll(@PageableDefault(size = 20, sort = "name") Pageable pageable) {
+        return medicamentService.findAll(pageable);
     }
-        
-    @PostMapping public Medicament guardar(@RequestBody Medicament medicament) {
-        return medicamentRepo.save(medicament);
+
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    public Medicament create(@Valid @RequestBody MedicamentRequest request) {
+        return medicamentService.create(request);
     }
-    
 }
