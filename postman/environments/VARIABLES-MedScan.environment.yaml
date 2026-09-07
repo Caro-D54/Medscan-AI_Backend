@@ -1,0 +1,4 @@
+name: VARIABLES-MedScan
+values:
+  - key: baseUrl
+    value: ''

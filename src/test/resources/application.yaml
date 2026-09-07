@@ -16,7 +16,7 @@ spring:
 
 app:
   jwt:
-    secret: test_only_jwt_secret_that_is_long_enough_123456
+    secret: test_only_jwt_secret_that_is_at_least_32_chars_long
     expiration-ms: 86400000
 
 server:
