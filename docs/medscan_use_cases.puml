@@ -1,0 +1,88 @@
+@startuml
+title MedScan AI - Diagrama de Casos de Uso
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam usecase {
+  BackgroundColor<<implementado>> #D5F5E3
+  BorderColor<<implementado>> #1E8449
+  BackgroundColor<<planeado>> #FDEBD0
+  BorderColor<<planeado>> #CA6F1E
+  BackgroundColor<<parcial>> #FCF3CF
+  BorderColor<<parcial>> #B7950B
+}
+left to right direction
+
+actor "Usuario\n(Paciente)" as Usuario
+actor "Servicio de\nescaneo/IA" as OCR <<planeado>>
+actor "Base de datos\nPostgreSQL" as DB
+
+rectangle "Sistema MedScan AI" {
+
+  usecase "Ver página de inicio"              as UC1  <<implementado>>
+  usecase "Ver panel de control\n(Dashboard)"  as UC2  <<implementado>>
+  usecase "Consultar lista\nde medicamentos"   as UC3  <<implementado>>
+  usecase "Registrar medicamento\n(manual)"    as UC4  <<implementado>>
+  usecase "Buscar medicamento\npor nombre"     as UC5  <<parcial>>
+  usecase "Escanear medicamento\ncon cámara"   as UC6  <<planeado>>
+  usecase "Ver alertas de\ninteracción de fármacos" as UC7 <<planeado>>
+  usecase "Ver guía de toma\n(con/sin alimentos)"    as UC8 <<planeado>>
+  usecase "Persistir datos\ndel medicamento"   as UC9  <<implementado>>
+}
+
+Usuario --> UC1
+Usuario --> UC2
+Usuario --> UC3
+Usuario --> UC4
+Usuario --> UC5
+Usuario --> UC6
+Usuario --> UC7
+Usuario --> UC8
+
+UC6 .> UC4 : <<include>>
+UC6 .> OCR : <<include>>
+UC7 .> UC3 : <<include>>
+UC8 .> UC3 : <<include>>
+UC5 .> UC3 : <<extend>>
+
+UC3 --> DB
+UC4 --> UC9
+UC9 --> DB
+UC5 --> DB
+
+note right of UC6
+  Descrito en el README del
+  frontend, pero el repo
+  actualmente solo contiene
+  el README (sin código).
+end note
+
+note right of UC7
+  Campo "DangerousInteractions"
+  existe en la entidad Medicament,
+  pero no hay lógica de comparación
+  ni endpoint que la exponga.
+end note
+
+note right of UC5
+  MedicamentRepo.findByName()
+  está definido pero no está
+  expuesto por ningún @GetMapping
+  en el controller.
+end note
+
+note bottom of UC1
+  HomeController -> home.html
+end note
+
+note bottom of UC2
+  HomeController -> user.html
+end note
+
+legend right
+  |= Color |= Estado |
+  |<#D5F5E3>| Implementado en el código actual |
+  |<#FCF3CF>| Parcialmente implementado |
+  |<#FDEBD0>| Planeado (solo en README, sin código) |
+endlegend
+
+@enduml
