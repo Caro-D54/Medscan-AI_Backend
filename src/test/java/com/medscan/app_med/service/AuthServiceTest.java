@@ -50,6 +50,10 @@ class AuthServiceTest {
         AuthResponse response = authService.register(request);
 
         assertThat(response.getToken()).isEqualTo("jwt-token");
+        assertThat(response.getUser()).isNotNull();
+        assertThat(response.getUser().id()).isEqualTo(1L);
+        assertThat(response.getUser().name()).isEqualTo("Carolina");
+        assertThat(response.getUser().email()).isEqualTo("caro@medscan.com");
         verify(userRepo).existsByEmail("caro@medscan.com");
         verify(passwordEncoder).encode("secret123");
         verify(userRepo).save(any(User.class));
@@ -82,6 +86,10 @@ class AuthServiceTest {
         AuthResponse response = authService.login(request);
 
         assertThat(response.getToken()).isEqualTo("jwt-token");
+        assertThat(response.getUser()).isNotNull();
+        assertThat(response.getUser().id()).isEqualTo(1L);
+        assertThat(response.getUser().name()).isEqualTo("Carolina");
+        assertThat(response.getUser().email()).isEqualTo("caro@medscan.com");
     }
 
     @Test

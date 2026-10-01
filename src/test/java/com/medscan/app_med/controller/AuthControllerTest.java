@@ -7,6 +7,7 @@ import com.medscan.app_med.service.DuplicateEmailException;
 import com.medscan.app_med.service.InvalidCredentialsException;
 import com.medscan.app_med.service.RegisterRequest;
 import com.medscan.app_med.service.LoginRequest;
+import com.medscan.app_med.service.UserResponse;
 import com.medscan.app_med.security.JwtService;
 import com.medscan.app_med.repository.UserRepo;
 import org.junit.jupiter.api.Test;
@@ -47,7 +48,8 @@ class AuthControllerTest {
 
     @Test
     void registerReturns201AndToken() throws Exception {
-        AuthResponse response = new AuthResponse("jwt-token");
+        UserResponse user = new UserResponse(1L, "Carolina", "caro@medscan.com");
+        AuthResponse response = new AuthResponse("jwt-token", user);
         when(authService.register(any(RegisterRequest.class))).thenReturn(response);
 
         mockMvc.perform(post("/api/v1/auth/register")
@@ -55,7 +57,10 @@ class AuthControllerTest {
                         .content("""
                                 {"email":"caro@medscan.com","password":"secret123","name":"Carolina"}"""))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.token").value("jwt-token"));
+                .andExpect(jsonPath("$.token").value("jwt-token"))
+                .andExpect(jsonPath("$.user.id").value(1))
+                .andExpect(jsonPath("$.user.name").value("Carolina"))
+                .andExpect(jsonPath("$.user.email").value("caro@medscan.com"));
     }
 
     @Test
@@ -81,7 +86,8 @@ class AuthControllerTest {
 
     @Test
     void loginReturns200AndToken() throws Exception {
-        AuthResponse response = new AuthResponse("jwt-token");
+        UserResponse user = new UserResponse(1L, "Carolina", "caro@medscan.com");
+        AuthResponse response = new AuthResponse("jwt-token", user);
         when(authService.login(any(LoginRequest.class))).thenReturn(response);
 
         mockMvc.perform(post("/api/v1/auth/login")
@@ -89,7 +95,10 @@ class AuthControllerTest {
                         .content("""
                                 {"email":"caro@medscan.com","password":"secret123"}"""))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.token").value("jwt-token"));
+                .andExpect(jsonPath("$.token").value("jwt-token"))
+                .andExpect(jsonPath("$.user.id").value(1))
+                .andExpect(jsonPath("$.user.name").value("Carolina"))
+                .andExpect(jsonPath("$.user.email").value("caro@medscan.com"));
     }
 
     @Test

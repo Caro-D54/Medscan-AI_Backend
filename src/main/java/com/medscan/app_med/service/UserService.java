@@ -23,6 +23,11 @@ public class UserService {
         return userRepo.save(user);
     }
 
+    @Transactional(readOnly = true)
+    public UserResponse getCurrentUser() {
+        return UserResponse.fromUser(currentUser());
+    }
+
     private User currentUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication != null && authentication.getPrincipal() instanceof User user) {

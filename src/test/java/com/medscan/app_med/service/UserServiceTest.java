@@ -55,4 +55,14 @@ class UserServiceTest {
         assertThat(result).isSameAs(currentUser);
         verify(userRepo).save(currentUser);
     }
+
+    @Test
+    void getCurrentUserReturnsUserResponseForAuthenticatedUser() {
+        UserResponse response = userService.getCurrentUser();
+
+        assertThat(response).isNotNull();
+        assertThat(response.id()).isEqualTo(1L);
+        assertThat(response.name()).isEqualTo("Carolina");
+        assertThat(response.email()).isEqualTo("caro@medscan.com");
+    }
 }
