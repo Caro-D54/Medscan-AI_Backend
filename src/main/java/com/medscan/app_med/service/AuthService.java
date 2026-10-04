@@ -30,7 +30,7 @@ public class AuthService {
         user.setName(request.name());
         User saved = userRepo.save(user);
 
-        return new AuthResponse(jwtService.generateToken(saved), UserResponse.fromUser(saved));
+        return new AuthResponse(jwtService.generateToken(saved), UserDto.fromEntity(saved));
     }
 
     public AuthResponse login(LoginRequest request) {
@@ -41,6 +41,6 @@ public class AuthService {
             throw new InvalidCredentialsException();
         }
 
-        return new AuthResponse(jwtService.generateToken(user), UserResponse.fromUser(user));
+        return new AuthResponse(jwtService.generateToken(user), UserDto.fromEntity(user));
     }
 }

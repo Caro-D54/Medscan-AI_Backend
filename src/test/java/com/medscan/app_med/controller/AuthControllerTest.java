@@ -7,7 +7,6 @@ import com.medscan.app_med.service.DuplicateEmailException;
 import com.medscan.app_med.service.InvalidCredentialsException;
 import com.medscan.app_med.service.RegisterRequest;
 import com.medscan.app_med.service.LoginRequest;
-import com.medscan.app_med.service.UserResponse;
 import com.medscan.app_med.security.JwtService;
 import com.medscan.app_med.repository.UserRepo;
 import org.junit.jupiter.api.Test;
@@ -47,9 +46,8 @@ class AuthControllerTest {
     private UserRepo userRepo;
 
     @Test
-    void registerReturns201AndToken() throws Exception {
-        UserResponse user = new UserResponse(1L, "Carolina", "caro@medscan.com");
-        AuthResponse response = new AuthResponse("jwt-token", user);
+    void registerReturns201AndTokenAndUser() throws Exception {
+        AuthResponse response = new AuthResponse("jwt-token", new com.medscan.app_med.service.UserDto(1L, "Carolina", "caro@medscan.com"));
         when(authService.register(any(RegisterRequest.class))).thenReturn(response);
 
         mockMvc.perform(post("/api/v1/auth/register")
@@ -85,9 +83,8 @@ class AuthControllerTest {
     }
 
     @Test
-    void loginReturns200AndToken() throws Exception {
-        UserResponse user = new UserResponse(1L, "Carolina", "caro@medscan.com");
-        AuthResponse response = new AuthResponse("jwt-token", user);
+    void loginReturns200AndTokenAndUser() throws Exception {
+        AuthResponse response = new AuthResponse("jwt-token", new com.medscan.app_med.service.UserDto(1L, "Carolina", "caro@medscan.com"));
         when(authService.login(any(LoginRequest.class))).thenReturn(response);
 
         mockMvc.perform(post("/api/v1/auth/login")

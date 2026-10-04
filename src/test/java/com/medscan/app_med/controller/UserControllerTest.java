@@ -12,13 +12,8 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
-import com.medscan.app_med.service.UserResponse;
-
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(UserController.class)
@@ -59,14 +54,14 @@ class UserControllerTest {
     }
 
     @Test
-    void getCurrentUserReturns200AndUserProfile() throws Exception {
-        UserResponse profile = new UserResponse(1L, "Carolina", "caro@medscan.com");
-        when(userService.getCurrentUser()).thenReturn(profile);
+    void getMeReturnsCurrentUser() throws Exception {
+        org.mockito.Mockito.when(userService.getCurrentUser())
+                .thenReturn(new com.medscan.app_med.service.UserDto(1L, "Carolina", "caro@medscan.com"));
 
-        mockMvc.perform(get("/api/v1/users/me"))
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/users/me"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(1))
-                .andExpect(jsonPath("$.name").value("Carolina"))
-                .andExpect(jsonPath("$.email").value("caro@medscan.com"));
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.id").value(1))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.name").value("Carolina"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.email").value("caro@medscan.com"));
     }
 }

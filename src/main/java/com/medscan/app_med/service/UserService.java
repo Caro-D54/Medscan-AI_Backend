@@ -23,9 +23,8 @@ public class UserService {
         return userRepo.save(user);
     }
 
-    @Transactional(readOnly = true)
-    public UserResponse getCurrentUser() {
-        return UserResponse.fromUser(currentUser());
+    public UserDto getCurrentUser() {
+        return UserDto.fromEntity(currentUser());
     }
 
     private User currentUser() {
