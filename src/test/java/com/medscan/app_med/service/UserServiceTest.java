@@ -15,6 +15,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -54,5 +55,33 @@ class UserServiceTest {
         assertThat(currentUser.getPushToken()).isEqualTo("ExponentPushToken[abcd1234]");
         assertThat(result).isSameAs(currentUser);
         verify(userRepo).save(currentUser);
+    }
+
+    @Test
+    void getCurrentUserReturnsUserDtoForAuthenticatedUser() {
+        UserDto result = userService.getCurrentUser();
+
+        assertThat(result).isNotNull();
+        assertThat(result.id()).isEqualTo(1L);
+        assertThat(result.name()).isEqualTo("Carolina");
+        assertThat(result.email()).isEqualTo("caro@medscan.com");
+    }
+
+    @Test
+    void getCurrentUserThrowsWhenNotAuthenticated() {
+        SecurityContextHolder.clearContext();
+
+        assertThatThrownBy(() -> userService.getCurrentUser())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("No authenticated user");
+    }
+
+    @Test
+    void updatePushTokenThrowsWhenNotAuthenticated() {
+        SecurityContextHolder.clearContext();
+
+        assertThatThrownBy(() -> userService.updatePushToken("token123"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("No authenticated user");
     }
 }

@@ -67,6 +67,20 @@ public class TreatmentService {
         return doseRepo.save(dose);
     }
 
+    @Transactional(readOnly = true)
+    public List<Treatment> getActiveTreatments() {
+        return getTreatments(true);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Treatment> getTreatments(boolean activeOnly) {
+        User user = currentUser();
+        if (activeOnly) {
+            return treatmentRepo.findActiveByUser(user, LocalDate.now());
+        }
+        return treatmentRepo.findAllByUser(user);
+    }
+
     private void scheduleDoses(Treatment treatment) {
         List<LocalTime> dailyTimes = dailyTimes(treatment.getStartTime(), treatment.getIntervalHours());
         LocalDate day = treatment.getStartDate();

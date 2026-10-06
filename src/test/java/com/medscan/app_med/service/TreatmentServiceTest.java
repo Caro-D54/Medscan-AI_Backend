@@ -202,4 +202,40 @@ class TreatmentServiceTest {
         assertThatThrownBy(() -> treatmentService.markDose(7L, DoseStatus.TAKEN))
                 .isInstanceOf(DoseNotFoundException.class);
     }
+
+    @Test
+    void getActiveTreatmentsReturnsActiveTreatmentsForCurrentUser() {
+        Treatment treatment = new Treatment();
+        treatment.setId(10L);
+        treatment.setUser(currentUser);
+        when(treatmentRepo.findActiveByUser(org.mockito.ArgumentMatchers.eq(currentUser), org.mockito.ArgumentMatchers.any(LocalDate.class)))
+                .thenReturn(List.of(treatment));
+
+        List<Treatment> results = treatmentService.getActiveTreatments();
+
+        assertThat(results).containsExactly(treatment);
+        verify(treatmentRepo).findActiveByUser(org.mockito.ArgumentMatchers.eq(currentUser), org.mockito.ArgumentMatchers.any(LocalDate.class));
+    }
+
+    @Test
+    void getTreatmentsWithActiveOnlyFalseReturnsAllTreatments() {
+        Treatment treatment = new Treatment();
+        treatment.setId(11L);
+        treatment.setUser(currentUser);
+        when(treatmentRepo.findAllByUser(currentUser)).thenReturn(List.of(treatment));
+
+        List<Treatment> results = treatmentService.getTreatments(false);
+
+        assertThat(results).containsExactly(treatment);
+        verify(treatmentRepo).findAllByUser(currentUser);
+    }
+
+    @Test
+    void getTreatmentsThrowsWhenNotAuthenticated() {
+        SecurityContextHolder.clearContext();
+
+        assertThatThrownBy(() -> treatmentService.getActiveTreatments())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("No authenticated user");
+    }
 }

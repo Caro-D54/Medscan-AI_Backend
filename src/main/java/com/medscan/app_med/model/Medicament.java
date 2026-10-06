@@ -1,5 +1,7 @@
 package com.medscan.app_med.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -15,6 +17,7 @@ import lombok.Data;
 @Entity
 @Table(name = "medicaments")
 @Data
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class Medicament {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -35,5 +38,6 @@ public class Medicament {
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "user_id")
+    @JsonIgnore
     private User user;
 }

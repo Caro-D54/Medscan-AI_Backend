@@ -32,7 +32,9 @@ import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -159,5 +161,33 @@ class TreatmentControllerTest {
                         .content("""
                                 { "status": "TAKEN" }"""))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void getTreatmentsReturns200AndActiveTreatmentsList() throws Exception {
+        when(treatmentService.getTreatments(true))
+                .thenReturn(List.of(treatmentWithScheduledDoses()));
+
+        mockMvc.perform(get("/api/v1/treatments"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].id").value(1))
+                .andExpect(jsonPath("$[0].medicationName").value("Acetaminophen"))
+                .andExpect(jsonPath("$[0].doses.length()").value(1))
+                .andExpect(jsonPath("$[0].doses[0].status").value("PENDING"));
+
+        verify(treatmentService).getTreatments(true);
+    }
+
+    @Test
+    void getTreatmentsWithActiveOnlyFalseCallsServiceAccordingly() throws Exception {
+        when(treatmentService.getTreatments(false))
+                .thenReturn(List.of(treatmentWithScheduledDoses()));
+
+        mockMvc.perform(get("/api/v1/treatments").param("activeOnly", "false"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1));
+
+        verify(treatmentService).getTreatments(false);
     }
 }

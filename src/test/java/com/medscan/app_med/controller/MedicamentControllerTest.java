@@ -112,6 +112,26 @@ class MedicamentControllerTest {
     }
 
     @Test
+    void createMedicationWithPosologyFieldsAcceptsPayload() throws Exception {
+        Medicament saved = new Medicament();
+        saved.setId(1L);
+        saved.setName("Acetaminophen");
+        when(medicationService.createMedication(any(Medicament.class))).thenReturn(saved);
+
+        mockMvc.perform(post("/api/v1/medications")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "name": "Acetaminophen",
+                                  "dosage": "500mg",
+                                  "frequency": "cada 8 horas",
+                                  "instructions": "Tomar con abundante agua"
+                                }"""))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value(1));
+    }
+
+    @Test
     void updateMedicationReturns200() throws Exception {
         long id = 1L;
         Medicament updated = new Medicament();
