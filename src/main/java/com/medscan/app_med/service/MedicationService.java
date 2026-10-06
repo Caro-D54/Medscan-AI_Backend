@@ -26,6 +26,11 @@ public class MedicationService {
         return medicamentRepo.findByUserAndNameContainingIgnoreCase(user, nameFilter.trim(), pageable);
     }
 
+    public Medicament getMedicationById(Long id) {
+        return medicamentRepo.findByIdAndUser(id, currentUser())
+                .orElseThrow(MedicationNotFoundException::new);
+    }
+
     public Medicament createMedication(Medicament medicament) {
         medicament.setId(null);
         medicament.setUser(currentUser());

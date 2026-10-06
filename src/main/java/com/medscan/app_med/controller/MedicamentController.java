@@ -35,6 +35,11 @@ public class MedicamentController {
         return medicationService.getMedications(name, PageRequest.of(page, size, Sort.by(Sort.Direction.ASC, "id")));
     }
 
+    @GetMapping("/{id}")
+    public ResponseEntity<Medicament> getMedicationById(@PathVariable Long id) {
+        return ResponseEntity.ok(medicationService.getMedicationById(id));
+    }
+
     @PostMapping
     public ResponseEntity<Medicament> createMedication(@Valid @RequestBody Medicament medicament) {
         Medicament saved = medicationService.createMedication(medicament);

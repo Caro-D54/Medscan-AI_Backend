@@ -156,4 +156,28 @@ class MedicamentControllerTest {
         mockMvc.perform(delete("/api/v1/medications/{id}", id))
                 .andExpect(status().isNotFound());
     }
+
+    @Test
+    void getMedicationByIdReturns200AndMedication() throws Exception {
+        long id = 1L;
+        Medicament med = new Medicament();
+        med.setId(id);
+        med.setName("Acetaminophen");
+        when(medicationService.getMedicationById(id)).thenReturn(med);
+
+        mockMvc.perform(get("/api/v1/medications/{id}", id))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(1))
+                .andExpect(jsonPath("$.name").value("Acetaminophen"));
+    }
+
+    @Test
+    void getMedicationByIdNotFoundReturns404() throws Exception {
+        long id = 99L;
+        when(medicationService.getMedicationById(id))
+                .thenThrow(new MedicationNotFoundException());
+
+        mockMvc.perform(get("/api/v1/medications/{id}", id))
+                .andExpect(status().isNotFound());
+    }
 }

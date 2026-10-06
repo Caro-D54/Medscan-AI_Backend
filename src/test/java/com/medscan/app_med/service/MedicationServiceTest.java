@@ -144,4 +144,29 @@ class MedicationServiceTest {
         assertThatThrownBy(() -> medicationService.deleteMedication(id))
                 .isInstanceOf(MedicationNotFoundException.class);
     }
+
+    @Test
+    void getMedicationByIdReturnsOwnedMedication() {
+        Long id = 5L;
+        Medicament existing = new Medicament();
+        existing.setId(id);
+        existing.setName("Amoxicilina");
+        existing.setUser(currentUser);
+        when(medicamentRepo.findByIdAndUser(id, currentUser)).thenReturn(Optional.of(existing));
+
+        Medicament result = medicationService.getMedicationById(id);
+
+        assertThat(result).isSameAs(existing);
+        assertThat(result.getName()).isEqualTo("Amoxicilina");
+        verify(medicamentRepo).findByIdAndUser(id, currentUser);
+    }
+
+    @Test
+    void getMedicationByIdNotFoundThrowsMedicationNotFoundException() {
+        Long id = 99L;
+        when(medicamentRepo.findByIdAndUser(id, currentUser)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> medicationService.getMedicationById(id))
+                .isInstanceOf(MedicationNotFoundException.class);
+    }
 }
