@@ -41,3 +41,8 @@ build/
 ### Configuración local sensible ###
 application-dev.yaml
 application-dev.yml
+boot.ps1
+
+### Compiled Class Files ###
+*.class
+
