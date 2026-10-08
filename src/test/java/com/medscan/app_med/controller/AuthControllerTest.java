@@ -47,7 +47,7 @@ class AuthControllerTest {
 
     @Test
     void registerReturns201AndTokenAndUser() throws Exception {
-        AuthResponse response = new AuthResponse("jwt-token", new com.medscan.app_med.service.UserDto(1L, "Carolina", "caro@medscan.com"));
+        AuthResponse response = new AuthResponse("jwt-token", new com.medscan.app_med.service.UserDto(1L, "Carolina", "caro@medscan.com", com.medscan.app_med.model.Role.USER));
         when(authService.register(any(RegisterRequest.class))).thenReturn(response);
 
         mockMvc.perform(post("/api/v1/auth/register")
@@ -58,7 +58,8 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.token").value("jwt-token"))
                 .andExpect(jsonPath("$.user.id").value(1))
                 .andExpect(jsonPath("$.user.name").value("Carolina"))
-                .andExpect(jsonPath("$.user.email").value("caro@medscan.com"));
+                .andExpect(jsonPath("$.user.email").value("caro@medscan.com"))
+                .andExpect(jsonPath("$.user.role").value("USER"));
     }
 
     @Test
@@ -84,7 +85,7 @@ class AuthControllerTest {
 
     @Test
     void loginReturns200AndTokenAndUser() throws Exception {
-        AuthResponse response = new AuthResponse("jwt-token", new com.medscan.app_med.service.UserDto(1L, "Carolina", "caro@medscan.com"));
+        AuthResponse response = new AuthResponse("jwt-token", new com.medscan.app_med.service.UserDto(1L, "Carolina", "caro@medscan.com", com.medscan.app_med.model.Role.USER));
         when(authService.login(any(LoginRequest.class))).thenReturn(response);
 
         mockMvc.perform(post("/api/v1/auth/login")
@@ -95,7 +96,8 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.token").value("jwt-token"))
                 .andExpect(jsonPath("$.user.id").value(1))
                 .andExpect(jsonPath("$.user.name").value("Carolina"))
-                .andExpect(jsonPath("$.user.email").value("caro@medscan.com"));
+                .andExpect(jsonPath("$.user.email").value("caro@medscan.com"))
+                .andExpect(jsonPath("$.user.role").value("USER"));
     }
 
     @Test

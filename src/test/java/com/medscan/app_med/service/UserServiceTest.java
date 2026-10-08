@@ -37,6 +37,7 @@ class UserServiceTest {
         currentUser.setEmail("caro@medscan.com");
         currentUser.setPassword("hashed");
         currentUser.setName("Carolina");
+        currentUser.setRole(com.medscan.app_med.model.Role.USER);
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(currentUser, null, List.of()));
     }
@@ -65,6 +66,7 @@ class UserServiceTest {
         assertThat(result.id()).isEqualTo(1L);
         assertThat(result.name()).isEqualTo("Carolina");
         assertThat(result.email()).isEqualTo("caro@medscan.com");
+        assertThat(result.role()).isEqualTo(com.medscan.app_med.model.Role.USER);
     }
 
     @Test

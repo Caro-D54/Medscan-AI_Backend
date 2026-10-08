@@ -21,4 +21,8 @@ public class User {
     private String name;
 
     private String pushToken;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private Role role = Role.USER;
 }

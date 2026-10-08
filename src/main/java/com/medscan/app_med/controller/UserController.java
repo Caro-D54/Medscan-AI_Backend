@@ -31,4 +31,5 @@ public class UserController {
         userService.updatePushToken(request.pushToken());
         return ResponseEntity.noContent().build();
     }
+    
 }

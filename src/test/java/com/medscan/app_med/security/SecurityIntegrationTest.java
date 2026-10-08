@@ -102,7 +102,8 @@ class SecurityIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(savedUser.getId()))
                 .andExpect(jsonPath("$.name").value("GetMe User"))
-                .andExpect(jsonPath("$.email").value("getme@medscan.com"));
+                .andExpect(jsonPath("$.email").value("getme@medscan.com"))
+                .andExpect(jsonPath("$.role").value("USER"));
     }
 
     @Test
@@ -115,7 +116,8 @@ class SecurityIntegrationTest {
                 .andExpect(jsonPath("$.token").isString())
                 .andExpect(jsonPath("$.user.id").isNumber())
                 .andExpect(jsonPath("$.user.name").value("Full Auth"))
-                .andExpect(jsonPath("$.user.email").value("fullauth@medscan.com"));
+                .andExpect(jsonPath("$.user.email").value("fullauth@medscan.com"))
+                .andExpect(jsonPath("$.user.role").value("USER"));
 
         mockMvc.perform(post("/api/v1/auth/login")
                         .contentType("application/json")
@@ -125,7 +127,19 @@ class SecurityIntegrationTest {
                 .andExpect(jsonPath("$.token").isString())
                 .andExpect(jsonPath("$.user.id").isNumber())
                 .andExpect(jsonPath("$.user.name").value("Full Auth"))
-                .andExpect(jsonPath("$.user.email").value("fullauth@medscan.com"));
+                .andExpect(jsonPath("$.user.email").value("fullauth@medscan.com"))
+                .andExpect(jsonPath("$.user.role").value("USER"));
+    }
+
+    @Test
+    void registerAdminReturnsRoleAdmin() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType("application/json")
+                        .content("""
+                                {"email":"adminuser@medscan.com","password":"secretPass123","name":"Admin User","role":"ADMIN"}"""))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.token").isString())
+                .andExpect(jsonPath("$.user.role").value("ADMIN"));
     }
 
     @Test

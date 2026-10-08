@@ -1,10 +1,12 @@
 package com.medscan.app_med.service;
 
+import com.medscan.app_med.model.Role;
 import com.medscan.app_med.model.User;
 import com.medscan.app_med.repository.UserRepo;
 import com.medscan.app_med.security.JwtService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -34,13 +36,14 @@ class AuthServiceTest {
     private AuthService authService;
 
     @Test
-    void registerEncryptsPasswordAndReturnsToken() {
+    void registerEncryptsPasswordAndDefaultsRoleToUser() {
         RegisterRequest request = new RegisterRequest("caro@medscan.com", "secret123", "Carolina");
         User saved = new User();
         saved.setId(1L);
         saved.setEmail("caro@medscan.com");
         saved.setPassword("hashed");
         saved.setName("Carolina");
+        saved.setRole(Role.USER);
 
         when(userRepo.existsByEmail("caro@medscan.com")).thenReturn(false);
         when(passwordEncoder.encode("secret123")).thenReturn("hashed");
@@ -54,10 +57,36 @@ class AuthServiceTest {
         assertThat(response.getUser().id()).isEqualTo(1L);
         assertThat(response.getUser().name()).isEqualTo("Carolina");
         assertThat(response.getUser().email()).isEqualTo("caro@medscan.com");
-        verify(userRepo).existsByEmail("caro@medscan.com");
-        verify(passwordEncoder).encode("secret123");
-        verify(userRepo).save(any(User.class));
-        verify(jwtService).generateToken(saved);
+        assertThat(response.getUser().role()).isEqualTo(Role.USER);
+
+        ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+        verify(userRepo).save(captor.capture());
+        assertThat(captor.getValue().getRole()).isEqualTo(Role.USER);
+    }
+
+    @Test
+    void registerWithExplicitAdminRoleSetsAdminRole() {
+        RegisterRequest request = new RegisterRequest("admin@medscan.com", "secret123", "Admin User", Role.ADMIN);
+        User saved = new User();
+        saved.setId(2L);
+        saved.setEmail("admin@medscan.com");
+        saved.setPassword("hashed");
+        saved.setName("Admin User");
+        saved.setRole(Role.ADMIN);
+
+        when(userRepo.existsByEmail("admin@medscan.com")).thenReturn(false);
+        when(passwordEncoder.encode("secret123")).thenReturn("hashed");
+        when(userRepo.save(any(User.class))).thenReturn(saved);
+        when(jwtService.generateToken(saved)).thenReturn("jwt-admin-token");
+
+        AuthResponse response = authService.register(request);
+
+        assertThat(response.getToken()).isEqualTo("jwt-admin-token");
+        assertThat(response.getUser().role()).isEqualTo(Role.ADMIN);
+
+        ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
+        verify(userRepo).save(captor.capture());
+        assertThat(captor.getValue().getRole()).isEqualTo(Role.ADMIN);
     }
 
     @Test
@@ -71,13 +100,14 @@ class AuthServiceTest {
     }
 
     @Test
-    void loginWithValidCredentialsReturnsToken() {
+    void loginWithValidCredentialsReturnsTokenAndRole() {
         LoginRequest request = new LoginRequest("caro@medscan.com", "secret123");
         User user = new User();
         user.setId(1L);
         user.setEmail("caro@medscan.com");
         user.setPassword("hashed");
         user.setName("Carolina");
+        user.setRole(Role.USER);
 
         when(userRepo.findByEmail("caro@medscan.com")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("secret123", "hashed")).thenReturn(true);
@@ -90,6 +120,7 @@ class AuthServiceTest {
         assertThat(response.getUser().id()).isEqualTo(1L);
         assertThat(response.getUser().name()).isEqualTo("Carolina");
         assertThat(response.getUser().email()).isEqualTo("caro@medscan.com");
+        assertThat(response.getUser().role()).isEqualTo(Role.USER);
     }
 
     @Test

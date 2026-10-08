@@ -1,5 +1,6 @@
 package com.medscan.app_med.service;
 
+import com.medscan.app_med.model.Role;
 import com.medscan.app_med.model.User;
 import com.medscan.app_med.repository.UserRepo;
 import com.medscan.app_med.security.JwtService;
@@ -28,6 +29,7 @@ public class AuthService {
         user.setEmail(request.email());
         user.setPassword(passwordEncoder.encode(request.password()));
         user.setName(request.name());
+        user.setRole(request.role() != null ? request.role() : Role.USER);
         User saved = userRepo.save(user);
 
         return new AuthResponse(jwtService.generateToken(saved), UserDto.fromEntity(saved));

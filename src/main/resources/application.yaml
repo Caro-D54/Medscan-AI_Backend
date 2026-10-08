@@ -13,6 +13,16 @@ spring:
   jackson:
     serialization:
       write-dates-as-timestamps: false
+  hikari: 
+    maximum-pool-size: 5
+    minimum-idle: 3
+    idle-timeout: 30000
+    max-lifetime: 1800000
+    connection-timeout: 30000
+  
+  connection-test-query: SELECT 1 FROM DUAL 
+    initialization
+  mode: always
 
 server:
   port: 8080

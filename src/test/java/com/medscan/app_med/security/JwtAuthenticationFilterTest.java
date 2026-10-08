@@ -1,5 +1,6 @@
 package com.medscan.app_med.security;
 
+import com.medscan.app_med.model.Role;
 import com.medscan.app_med.model.User;
 import com.medscan.app_med.repository.UserRepo;
 import jakarta.servlet.FilterChain;
@@ -8,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.util.Optional;
@@ -31,10 +33,11 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
-    void authenticatesWhenBearerTokenIsValid() throws Exception {
+    void authenticatesWhenBearerTokenIsValidAndAssignsUserRole() throws Exception {
         User user = new User();
         user.setId(1L);
         user.setEmail("caro@medscan.com");
+        user.setRole(Role.USER);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.addHeader("Authorization", "Bearer valid-token");
@@ -48,6 +51,32 @@ class JwtAuthenticationFilterTest {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         assertThat(auth).isNotNull();
         assertThat(auth.getPrincipal()).isEqualTo(user);
+        assertThat(auth.getAuthorities()).extracting(GrantedAuthority::getAuthority)
+                .containsExactly("ROLE_USER");
+        verify(filterChain).doFilter(request, response);
+    }
+
+    @Test
+    void authenticatesWhenBearerTokenIsValidAndAssignsAdminRole() throws Exception {
+        User user = new User();
+        user.setId(2L);
+        user.setEmail("admin@medscan.com");
+        user.setRole(Role.ADMIN);
+
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader("Authorization", "Bearer admin-token");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        when(jwtService.extractEmail("admin-token")).thenReturn("admin@medscan.com");
+        when(userRepo.findByEmail("admin@medscan.com")).thenReturn(Optional.of(user));
+
+        filter.doFilter(request, response, filterChain);
+
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        assertThat(auth).isNotNull();
+        assertThat(auth.getPrincipal()).isEqualTo(user);
+        assertThat(auth.getAuthorities()).extracting(GrantedAuthority::getAuthority)
+                .containsExactly("ROLE_ADMIN");
         verify(filterChain).doFilter(request, response);
     }
 

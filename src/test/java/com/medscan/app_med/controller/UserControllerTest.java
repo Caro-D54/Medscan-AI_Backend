@@ -61,12 +61,13 @@ class UserControllerTest {
     @Test
     void getMeReturnsCurrentUser() throws Exception {
         when(userService.getCurrentUser())
-                .thenReturn(new UserDto(1L, "Carolina", "caro@medscan.com"));
+                .thenReturn(new UserDto(1L, "Carolina", "caro@medscan.com", com.medscan.app_med.model.Role.USER));
 
         mockMvc.perform(get("/api/v1/users/me"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(1))
                 .andExpect(jsonPath("$.name").value("Carolina"))
-                .andExpect(jsonPath("$.email").value("caro@medscan.com"));
+                .andExpect(jsonPath("$.email").value("caro@medscan.com"))
+                .andExpect(jsonPath("$.role").value("USER"));
     }
 }
