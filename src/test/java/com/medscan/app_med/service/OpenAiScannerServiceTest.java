@@ -27,6 +27,21 @@ class OpenAiScannerServiceTest {
     }
 
     @Test
+    void parseResponseExtractsMedicationFieldsFromMarkdownBlock() {
+        String response = """
+                {"choices":[{"message":{"role":"assistant","content":"```json\\n{\\"brandName\\":\\"Ibuprofeno\\",\\"activeIngredient\\":\\"Ibuprofeno 400 mg\\",\\"dosage\\":\\"1 comprimido\\",\\"frequency\\":\\"cada 8 horas\\"}\\n```"}}]}
+                """;
+
+        ScannedMedication result = service.parseResponse(response);
+
+        assertThat(result.brandName()).isEqualTo("Ibuprofeno");
+        assertThat(result.activeIngredient()).isEqualTo("Ibuprofeno 400 mg");
+        assertThat(result.dosage()).isEqualTo("1 comprimido");
+        assertThat(result.frequency()).isEqualTo("cada 8 horas");
+    }
+
+
+    @Test
     void parseResponseThrowsWhenNoChoices() {
         assertThatThrownBy(() -> service.parseResponse("{\"choices\":[]}"))
                 .isInstanceOf(ScanProcessingException.class);

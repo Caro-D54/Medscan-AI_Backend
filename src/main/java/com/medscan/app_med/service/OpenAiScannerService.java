@@ -22,18 +22,37 @@ public class OpenAiScannerService implements ScannerService {
                     + "brandName, activeIngredient, dosage, frequency.";
 
     private final ObjectMapper objectMapper;
+    private final RestClient restClient;
     private final String apiKey;
     private final String model;
     private final String url;
 
+    @org.springframework.beans.factory.annotation.Autowired
     public OpenAiScannerService(ObjectMapper objectMapper,
+                                RestClient.Builder restClientBuilder,
                                 @Value("${app.scan.openai.api-key:}") String apiKey,
                                 @Value("${app.scan.openai.model:gpt-4o-mini}") String model,
-                                @Value("${app.scan.openai.url:https://api.openai.com/v1/chat/completions}") String url) {
+                                @Value("${app.scan.openai.url:https://api.openai.com/v1/chat/completions}") String url,
+                                @Value("${app.scan.openai.timeout-ms:15000}") int timeoutMs) {
+
         this.objectMapper = objectMapper;
         this.apiKey = apiKey;
         this.model = model;
         this.url = url;
+
+        org.springframework.http.client.SimpleClientHttpRequestFactory requestFactory =
+                new org.springframework.http.client.SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(timeoutMs);
+        requestFactory.setReadTimeout(timeoutMs);
+
+        this.restClient = restClientBuilder.requestFactory(requestFactory).build();
+    }
+
+    public OpenAiScannerService(ObjectMapper objectMapper,
+                                String apiKey,
+                                String model,
+                                String url) {
+        this(objectMapper, RestClient.builder(), apiKey, model, url, 15000);
     }
 
     @Override
@@ -65,12 +84,26 @@ public class OpenAiScannerService implements ScannerService {
     }
 
     private ScannedMedication parseMedicationContent(String content) {
-        JsonNode medication = readTree(content);
+        String cleanJson = stripMarkdownCodeBlocks(content);
+        JsonNode medication = readTree(cleanJson);
         return new ScannedMedication(
                 medication.path("brandName").asText(null),
                 medication.path("activeIngredient").asText(null),
                 medication.path("dosage").asText(null),
                 medication.path("frequency").asText(null));
+    }
+
+    private String stripMarkdownCodeBlocks(String content) {
+        String trimmed = content.trim();
+        if (trimmed.startsWith("```json")) {
+            trimmed = trimmed.substring(7);
+        } else if (trimmed.startsWith("```")) {
+            trimmed = trimmed.substring(3);
+        }
+        if (trimmed.endsWith("```")) {
+            trimmed = trimmed.substring(0, trimmed.length() - 3);
+        }
+        return trimmed.trim();
     }
 
     private String buildRequest(byte[] imageBytes, String contentType) {
@@ -83,6 +116,7 @@ public class OpenAiScannerService implements ScannerService {
                 "content", List.of(
                         Map.of("type", "text", "text", EXTRACTION_PROMPT),
                         Map.of("type", "image_url", "image_url", Map.of("url", dataUrl))))));
+        body.put("response_format", Map.of("type", "json_object"));
 
         return writeJson(body);
     }
@@ -93,15 +127,19 @@ public class OpenAiScannerService implements ScannerService {
     }
 
     private String callOpenAi(String payload) {
-        return RestClient.create()
-                .post()
-                .uri(url)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(payload)
-                .retrieve()
-                .body(String.class);
+        try {
+            return restClient.post()
+                    .uri(url)
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(payload)
+                    .retrieve()
+                    .body(String.class);
+        } catch (Exception ex) {
+            throw new ScanProcessingException("Error en la comunicación con OpenAI: " + ex.getMessage(), ex);
+        }
     }
+
 
     private JsonNode readTree(String json) {
         try {

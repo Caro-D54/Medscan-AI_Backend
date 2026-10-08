@@ -3,6 +3,17 @@ spring:
     name: app-med
   profiles:
     active: dev
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/medscan_db}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:change_me}
+    driver-class-name: ${SPRING_DATASOURCE_DRIVER_CLASS_NAME:org.postgresql.Driver}
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 3
+      idle-timeout: 30000
+      max-lifetime: 1800000
+      connection-timeout: 30000
   jpa:
     hibernate:
       ddl-auto: update
@@ -13,21 +24,30 @@ spring:
   jackson:
     serialization:
       write-dates-as-timestamps: false
-  hikari: 
-    maximum-pool-size: 5
-    minimum-idle: 3
-    idle-timeout: 30000
-    max-lifetime: 1800000
-    connection-timeout: 30000
-  
-  connection-test-query: SELECT 1 FROM DUAL 
-    initialization
-  mode: always
 
 server:
-  port: 8080
+  port: ${SERVER_PORT:8080}
 
 app:
   jwt:
-    secret: ${JWT_SECRET}
+    secret: ${JWT_SECRET:change_me_jwt_secret_at_least_32_chars}
     expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+  scan:
+    openai:
+      api-key: ${SCAN_OPENAI_API_KEY:}
+      model: ${SCAN_OPENAI_MODEL:gpt-4o-mini}
+      url: ${SCAN_OPENAI_URL:https://api.openai.com/v1/chat/completions}
+      timeout-ms: ${SCAN_OPENAI_TIMEOUT_MS:15000}
+  notification:
+    expo:
+      url: ${NOTIFICATION_EXPO_URL:https://exp.host/--/api/v2/push/send}
+    reminder:
+      delay-ms: ${NOTIFICATION_REMINDER_DELAY_MS:60000}
+      advance-minutes: ${NOTIFICATION_REMINDER_ADVANCE_MINUTES:10}
+
+notification:
+  expo:
+    url: ${NOTIFICATION_EXPO_URL:https://exp.host/--/api/v2/push/send}
+  reminder:
+    delay-ms: ${NOTIFICATION_REMINDER_DELAY_MS:60000}
+    advance-minutes: ${NOTIFICATION_REMINDER_ADVANCE_MINUTES:10}

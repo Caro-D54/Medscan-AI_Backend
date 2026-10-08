@@ -41,15 +41,15 @@ public class MedicamentController {
     }
 
     @PostMapping
-    public ResponseEntity<Medicament> createMedication(@Valid @RequestBody Medicament medicament) {
-        Medicament saved = medicationService.createMedication(medicament);
+    public ResponseEntity<Medicament> createMedication(@Valid @RequestBody MedicamentRequest request) {
+        Medicament saved = medicationService.createMedication(request.toEntity());
         return ResponseEntity.status(HttpStatus.CREATED).body(saved);
     }
 
     @PutMapping("/{id}")
     public ResponseEntity<Medicament> updateMedication(@PathVariable Long id,
-                                                       @Valid @RequestBody Medicament medicament) {
-        return ResponseEntity.ok(medicationService.updateMedication(id, medicament));
+                                                       @Valid @RequestBody MedicamentRequest request) {
+        return ResponseEntity.ok(medicationService.updateMedication(id, request.toEntity()));
     }
 
     @DeleteMapping("/{id}")

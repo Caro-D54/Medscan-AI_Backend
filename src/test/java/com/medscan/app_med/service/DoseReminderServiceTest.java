@@ -110,4 +110,23 @@ class DoseReminderServiceTest {
         assertThat(sent).isZero();
         verify(pushNotificationSender, never()).send(any(PushNotification.class));
     }
+
+    @Test
+    void continuesProcessingWhenOneNotificationFails() {
+        Dose failing = doseFor(DoseStatus.PENDING, "failing-token", "Acetaminophen");
+        Dose successful = doseFor(DoseStatus.PENDING, "success-token", "Ibuprofen");
+        when(doseRepo.findDueToNotify(any(), any())).thenReturn(List.of(failing, successful));
+
+        org.mockito.Mockito.doThrow(new RuntimeException("Expo gateway timeout"))
+                .doNothing()
+                .when(pushNotificationSender).send(any(PushNotification.class));
+
+        int sent = doseReminderService.sendDueReminders();
+
+        assertThat(sent).isEqualTo(1);
+        verify(pushNotificationSender, times(2)).send(any(PushNotification.class));
+        assertThat(failing.getNotifiedAt()).isNull();
+        assertThat(successful.getNotifiedAt()).isNotNull();
+    }
 }
+
