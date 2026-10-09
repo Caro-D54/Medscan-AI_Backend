@@ -1,5 +1,5 @@
 @startuml
-title MedScan AI - Diagrama de Casos de Uso
+title MedScan AI - Diagrama de Casos de Uso (Sistema Completo)
 skinparam shadowing false
 skinparam packageStyle rectangle
 skinparam usecase {
@@ -7,82 +7,121 @@ skinparam usecase {
   BorderColor<<implementado>> #1E8449
   BackgroundColor<<planeado>> #FDEBD0
   BorderColor<<planeado>> #CA6F1E
-  BackgroundColor<<parcial>> #FCF3CF
-  BorderColor<<parcial>> #B7950B
 }
 left to right direction
 
+' --- Actores ---
 actor "Usuario\n(Paciente)" as Usuario
-actor "Servicio de\nescaneo/IA" as OCR <<planeado>>
-actor "Base de datos\nPostgreSQL" as DB
+actor "Servicio de IA / Visión\n(OpenAI API)" as AI <<servicio_externo>>
+actor "Servicio Push\n(Expo Notifications)" as Expo <<servicio_externo>>
+actor "Base de Datos\nPostgreSQL" as DB <<persistencia>>
+actor "Planificador de Tareas\n(Spring TaskScheduler)" as Scheduler <<sistema>>
 
 rectangle "Sistema MedScan AI" {
 
-  usecase "Ver página de inicio"              as UC1  <<implementado>>
-  usecase "Ver panel de control\n(Dashboard)"  as UC2  <<implementado>>
-  usecase "Consultar lista\nde medicamentos"   as UC3  <<implementado>>
-  usecase "Registrar medicamento\n(manual)"    as UC4  <<implementado>>
-  usecase "Buscar medicamento\npor nombre"     as UC5  <<parcial>>
-  usecase "Escanear medicamento\ncon cámara"   as UC6  <<planeado>>
-  usecase "Ver alertas de\ninteracción de fármacos" as UC7 <<planeado>>
-  usecase "Ver guía de toma\n(con/sin alimentos)"    as UC8 <<planeado>>
-  usecase "Persistir datos\ndel medicamento"   as UC9  <<implementado>>
+  package "Autenticación y Perfil" {
+    usecase "Registrarse en el sistema"            as UC_Reg       <<implementado>>
+    usecase "Iniciar sesión (JWT)"                as UC_Login     <<implementado>>
+    usecase "Cerrar sesión"                       as UC_Logout    <<implementado>>
+    usecase "Consultar perfil de usuario"         as UC_Profile   <<implementado>>
+    usecase "Sincronizar token Push"              as UC_PushToken <<implementado>>
+  }
+
+  package "Gestión de Medicamentos" {
+    usecase "Consultar lista de medicamentos"     as UC_ListMed   <<implementado>>
+    usecase "Buscar medicamento por nombre"       as UC_SearchMed <<implementado>>
+    usecase "Ver detalle e instrucciones del fármaco\n(guía de toma e interacciones)" as UC_DetailMed <<implementado>>
+    usecase "Registrar medicamento (manual)"      as UC_CreateMed <<implementado>>
+    usecase "Editar datos del medicamento"        as UC_UpdateMed <<implementado>>
+    usecase "Eliminar medicamento"                as UC_DeleteMed <<implementado>>
+  }
+
+  package "Escaneo Inteligente con IA" {
+    usecase "Escanear receta o prospecto con cámara" as UC_Scan <<implementado>>
+    usecase "Extraer posología y principio activo"   as UC_Extract <<implementado>>
+    usecase "Guardar medicamento desde escaneo"      as UC_SaveFromScan <<implementado>>
+  }
+
+  package "Tratamientos y Control de Dosis" {
+    usecase "Crear tratamiento y plan de dosis"   as UC_CreateTreat <<implementado>>
+    usecase "Consultar tratamientos activos"      as UC_ListTreat   <<implementado>>
+    usecase "Visualizar Dashboard\n(Próxima dosis y estado)" as UC_Dashboard <<implementado>>
+    usecase "Registrar toma de dosis (marcar tomada)" as UC_TakeDose <<implementado>>
+  }
+
+  package "Recordatorios y Notificaciones" {
+    usecase "Planificar recordatorios periódicos" as UC_Schedule <<implementado>>
+    usecase "Enviar notificación push de dosis"   as UC_SendPush  <<implementado>>
+    usecase "Recibir alerta en móvil"             as UC_RecvPush  <<implementado>>
+  }
+
+  package "Proyecciones Futuras" {
+    usecase "Motor de validación cruzada\nde interacciones farmacológicas" as UC_Interactions <<planeado>>
+  }
 }
 
-Usuario --> UC1
-Usuario --> UC2
-Usuario --> UC3
-Usuario --> UC4
-Usuario --> UC5
-Usuario --> UC6
-Usuario --> UC7
-Usuario --> UC8
+' --- Relaciones del Usuario ---
+Usuario --> UC_Reg
+Usuario --> UC_Login
+Usuario --> UC_Logout
+Usuario --> UC_Profile
 
-UC6 .> UC4 : <<include>>
-UC6 .> OCR : <<include>>
-UC7 .> UC3 : <<include>>
-UC8 .> UC3 : <<include>>
-UC5 .> UC3 : <<extend>>
+Usuario --> UC_ListMed
+Usuario --> UC_SearchMed
+Usuario --> UC_DetailMed
+Usuario --> UC_CreateMed
+Usuario --> UC_UpdateMed
+Usuario --> UC_DeleteMed
 
-UC3 --> DB
-UC4 --> UC9
-UC9 --> DB
-UC5 --> DB
+Usuario --> UC_Scan
+Usuario --> UC_SaveFromScan
 
-note right of UC6
-  Descrito en el README del
-  frontend, pero el repo
-  actualmente solo contiene
-  el README (sin código).
-end note
+Usuario --> UC_CreateTreat
+Usuario --> UC_ListTreat
+Usuario --> UC_Dashboard
+Usuario --> UC_TakeDose
 
-note right of UC7
-  Campo "DangerousInteractions"
-  existe en la entidad Medicament,
-  pero no hay lógica de comparación
-  ni endpoint que la exponga.
-end note
+Usuario <-- UC_RecvPush
 
-note right of UC5
-  MedicamentRepo.findByName()
-  está definido pero no está
-  expuesto por ningún @GetMapping
-  en el controller.
-end note
+' --- Extensiones e Inclusiones ---
+UC_SearchMed .> UC_ListMed : <<extend>>
+UC_Scan .> UC_Extract : <<include>>
+UC_SaveFromScan .> UC_Scan : <<extend>>
+UC_SaveFromScan .> UC_CreateMed : <<include>>
+UC_Dashboard .> UC_TakeDose : <<extend>>
+UC_Schedule .> UC_SendPush : <<include>>
+UC_SendPush .> UC_RecvPush : <<include>>
 
-note bottom of UC1
-  HomeController -> home.html
-end note
+UC_Interactions ..> UC_CreateTreat : <<extend>>
 
-note bottom of UC2
-  HomeController -> user.html
-end note
+' --- Relaciones con Servicios Externos y Persistencia ---
+UC_Extract --> AI
+UC_SendPush --> Expo
 
+Scheduler --> UC_Schedule
+
+UC_Reg --> DB
+UC_Login --> DB
+UC_Profile --> DB
+UC_PushToken --> DB
+
+UC_ListMed --> DB
+UC_SearchMed --> DB
+UC_DetailMed --> DB
+UC_CreateMed --> DB
+UC_UpdateMed --> DB
+UC_DeleteMed --> DB
+
+UC_CreateTreat --> DB
+UC_ListTreat --> DB
+UC_TakeDose --> DB
+UC_Schedule --> DB
+
+' --- Leyenda ---
 legend right
-  |= Color |= Estado |
-  |<#D5F5E3>| Implementado en el código actual |
-  |<#FCF3CF>| Parcialmente implementado |
-  |<#FDEBD0>| Planeado (solo en README, sin código) |
+  |= Color |= Estado |= Descripción |
+  |<#D5F5E3>| Implementado | Funcionalidad completa y probada en Frontend (Expo Router) y Backend (Spring Boot 3) |
+  |<#FDEBD0>| Planeado     | Módulo avanzado de verificación cruzada de interacciones entre múltiples medicamentos |
 endlegend
 
 @enduml
