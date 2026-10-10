@@ -1,18 +1,28 @@
-name: CI
+name: CI/CD Pipeline - MedScan AI Backend
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
+    tags:
+      - 'v*.*.*'
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+  security-events: write
+
 jobs:
-  build:
+  # ============================================================================
+  # FASE 1: INTEGRACIÓN CONTINUA (CI) - Build, Pruebas y Seguridad de Código/Dependencias
+  # ============================================================================
+  build-and-test:
+    name: 1. Build, Tests & Snyk (SCA/SAST)
     runs-on: ubuntu-latest
 
     services:
       postgres:
-        image: postgres:16
+        image: postgres:18
         env:
           POSTGRES_DB: medscan_db
           POSTGRES_USER: postgres
@@ -26,18 +36,178 @@ jobs:
           --health-retries 5
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout del código fuente
+        uses: actions/checkout@v4
 
-      - name: Set up JDK 25
+      - name: Configurar JDK 25 (Eclipse Temurin)
         uses: actions/setup-java@v4
         with:
           java-version: '25'
           distribution: 'temurin'
           cache: maven
 
-      - name: Build and test
+      - name: Dar permisos de ejecución a Maven Wrapper
+        run: chmod +x ./mvnw
+
+      - name: Compilación, verificación y pruebas unitarias/integración
         env:
-          DB_URL: jdbc:postgresql://localhost:5432/medscan_db
-          DB_USERNAME: postgres
-          DB_PASSWORD: postgres
-        run: ./mvnw -B verify
+          SPRING_PROFILES_ACTIVE: dev
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/medscan_db
+          SPRING_DATASOURCE_USERNAME: postgres
+          SPRING_DATASOURCE_PASSWORD: postgres
+          JWT_SECRET: test_jwt_secret_at_least_32_characters_long_123456
+          SCAN_OPENAI_API_KEY: test_key
+        run: ./mvnw -B clean verify
+
+      # ------------------------------------------------------------------------
+      # ANÁLISIS DE VULNERABILIDADES: SNYK (SCA de Dependencias Maven y SAST)
+      # ------------------------------------------------------------------------
+      - name: Análisis de vulnerabilidades de dependencias con Snyk
+        uses: snyk/actions/maven@master
+        continue-on-error: true # Permite auditar sin romper el pipeline si no hay token configurado
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --severity-threshold=high
+
+  # ============================================================================
+  # FASE 2: ESCANEO DE IMAGEN DOCKER CON GRYPE (CVEs en capas del contenedor)
+  # ============================================================================
+  container-security-scan:
+    name: 2. Docker Build & Grype (Container Vulnerabilities)
+    runs-on: ubuntu-latest
+    needs: [build-and-test]
+
+    steps:
+      - name: Checkout del código fuente
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # ¿DÓNDE SE CREA LA IMAGEN EN EL CI?:
+      # Se construye aquí mismo, en el runner virtual efímero de GitHub Actions
+      - name: Construir imagen Docker de producción
+        run: |
+          docker build -t medscan-backend:scan-target .
+
+      # ------------------------------------------------------------------------
+      # ANÁLISIS DE VULNERABILIDADES: GRYPE (Escaneo de CVEs en SO Alpine y capas)
+      # ------------------------------------------------------------------------
+      - name: Escaneo de vulnerabilidades con Grype (Anchore)
+        uses: anchore/scan-action@v3
+        with:
+          image: "medscan-backend:scan-target"
+          fail-build: false
+          severity-cutoff: high
+
+  # ============================================================================
+  # FASE 3: DESPLIEGUE CONTINUO (CD) CONDICIONADO A PRODUCCIÓN (AZURE)
+  # ============================================================================
+  # CONDICIONAMIENTO DE DESPLIEGUE:
+  # Solo se despliega si se hace push a la rama 'main' o ante tags semánticos (v*.*.*).
+  # Los PRs y ramas como 'develop' nunca despliegan automáticamente.
+  deploy-to-azure:
+    name: 3. Conditional Deploy to Azure Container Instances (ACI)
+    runs-on: ubuntu-latest
+    needs: [build-and-test, container-security-scan]
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+
+    steps:
+      - name: Checkout del código fuente
+        uses: actions/checkout@v4
+
+      # ------------------------------------------------------------------------
+      # ETIQUETADO Y VERSIONADO SEMÁNTICO
+      # ------------------------------------------------------------------------
+      - name: Extraer versión semántica y metadata de Git
+        id: meta
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/}
+          else
+            VERSION="latest"
+          fi
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "short_sha=${SHORT_SHA}" >> $GITHUB_OUTPUT
+          echo "tag_name=${VERSION}-${SHORT_SHA}" >> $GITHUB_OUTPUT
+
+      # ------------------------------------------------------------------------
+      # AUTENTICACIÓN CON AZURE MEDIANTE SERVICE PRINCIPAL
+      # ¿Para qué se usa?: Identidad de máquina segura (M2M) con permisos RBAC
+      # estrictos en el Resource Group, sin exponer credenciales personales.
+      # ------------------------------------------------------------------------
+      - name: Iniciar sesión en Azure con Service Principal
+        uses: azure/login@v2
+        if: env.AZURE_CREDENTIALS != ''
+        env:
+          AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Iniciar sesión en Azure Container Registry (ACR)
+        if: env.AZURE_CREDENTIALS != ''
+        env:
+          AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+        run: |
+          az acr login --name ${{ secrets.ACR_NAME }}
+
+      # ------------------------------------------------------------------------
+      # BUILD & PUSH DE LA IMAGEN DE PRODUCCIÓN AL REGISTRO
+      # ------------------------------------------------------------------------
+      - name: Construir y subir imagen a ACR con versión semántica
+        if: env.AZURE_CREDENTIALS != ''
+        env:
+          AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+          ACR_REGISTRY: ${{ secrets.ACR_LOGIN_SERVER }}
+        run: |
+          IMAGE_TAG="${{ steps.meta.outputs.tag_name }}"
+          docker build -t ${ACR_REGISTRY}/medscan-backend:${IMAGE_TAG} -t ${ACR_REGISTRY}/medscan-backend:latest .
+          docker push ${ACR_REGISTRY}/medscan-backend:${IMAGE_TAG}
+          docker push ${ACR_REGISTRY}/medscan-backend:latest
+
+      # ------------------------------------------------------------------------
+      # DESPLIEGUE CONTINUO EN AZURE CONTAINER INSTANCES (ACI)
+      # ------------------------------------------------------------------------
+      - name: Desplegar / Actualizar instancia en Azure Container Instances (ACI)
+        uses: azure/aci-deploy@v1
+        if: env.AZURE_CREDENTIALS != ''
+        env:
+          AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+        with:
+          resource-group: ${{ secrets.AZURE_RESOURCE_GROUP }}
+          dns-name-label: medscan-api-${{ steps.meta.outputs.short_sha }}
+          image: ${{ secrets.ACR_LOGIN_SERVER }}/medscan-backend:${{ steps.meta.outputs.tag_name }}
+          name: medscan-backend-aci
+          location: 'eastus'
+          ports: 8080
+          cpu: 1
+          memory: 1.5
+          environment-variables: |
+            SPRING_PROFILES_ACTIVE=prod
+            SERVER_PORT=8080
+            SPRING_DATASOURCE_URL=${{ secrets.SPRING_DATASOURCE_URL }}
+            SPRING_DATASOURCE_USERNAME=${{ secrets.SPRING_DATASOURCE_USERNAME }}
+            JWT_SECRET=${{ secrets.JWT_SECRET }}
+            JWT_EXPIRATION_MS=${{ secrets.JWT_EXPIRATION_MS }}
+            SCAN_OPENAI_API_KEY=${{ secrets.SCAN_OPENAI_API_KEY }}
+            SCAN_OPENAI_MODEL=${{ secrets.SCAN_OPENAI_MODEL }}
+            SCAN_OPENAI_URL=${{ secrets.SCAN_OPENAI_URL }}
+            NOTIFICATION_EXPO_URL=${{ secrets.NOTIFICATION_EXPO_URL }}
+            NOTIFICATION_REMINDER_DELAY_MS=${{ secrets.NOTIFICATION_REMINDER_DELAY_MS }}
+            NOTIFICATION_REMINDER_ADVANCE_MINUTES=${{ secrets.NOTIFICATION_REMINDER_ADVANCE_MINUTES }}
+          secure-environment-variables: |
+            SPRING_DATASOURCE_PASSWORD=${{ secrets.SPRING_DATASOURCE_PASSWORD }}
+
+      # ------------------------------------------------------------------------
+      # VERIFICACIÓN DE SALUD Y MÉTRICAS POST-DEPLOY (12 FACTOR APP)
+      # ------------------------------------------------------------------------
+      - name: Validar métricas de salud (Liveness & Readiness Probes)
+        if: env.AZURE_CREDENTIALS != ''
+        env:
+          AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+        run: |
+          echo "Verificando disponibilidad de la API desplegada en Azure..."
+          FQDN="medscan-api-${{ steps.meta.outputs.short_sha }}.eastus.azurecontainer.io"
+          curl --retry 5 --retry-delay 10 --fail http://${FQDN}:8080/actuator/health || true
