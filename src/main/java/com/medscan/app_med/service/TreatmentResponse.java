@@ -21,14 +21,17 @@ public record TreatmentResponse(
         if (treatment == null) {
             return null;
         }
+        Long medicationId = treatment.getMedicament() != null ? treatment.getMedicament().getId() : null;
+        String medicationName = treatment.getMedicament() != null ? treatment.getMedicament().getName() : null;
+
         List<DoseResponse> doseDtos = treatment.getDoses() == null
                 ? List.of()
                 : treatment.getDoses().stream().map(DoseResponse::fromEntity).toList();
 
         return new TreatmentResponse(
                 treatment.getId(),
-                treatment.getMedicationId(),
-                treatment.getMedicationName(),
+                medicationId,
+                medicationName,
                 treatment.getStartDate(),
                 treatment.getEndDate(),
                 treatment.getIntervalHours(),
