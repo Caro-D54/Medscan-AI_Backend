@@ -1,0 +1,524 @@
+{
+  "info": {
+    "_postman_id": "a90184b2-e1d9-4b62-9721-medscan-ai-v1",
+    "name": "MedScan AI - Backend API Suite",
+    "description": "Colección completa de pruebas para la API REST de MedScan AI (Spring Boot 3 + PostgreSQL 18).\nIncluye auto-guardado de token JWT, gestión de medicamentos, tratamientos, dosis y pruebas de resiliencia RFC 7807.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{jwt_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "01. Health & Actuator",
+      "item": [
+        {
+          "name": "Health Status (General)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/actuator/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["actuator", "health"]
+            },
+            "description": "Verifica que el servicio y la base de datos estén operativos (HTTP 200)."
+          }
+        },
+        {
+          "name": "Liveness Probe",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/actuator/health/liveness",
+              "host": ["{{baseUrl}}"],
+              "path": ["actuator", "health", "liveness"]
+            },
+            "description": "Sonda de liveness para orquestadores Docker/Kubernetes."
+          }
+        },
+        {
+          "name": "Readiness Probe",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/actuator/health/readiness",
+              "host": ["{{baseUrl}}"],
+              "path": ["actuator", "health", "readiness"]
+            },
+            "description": "Sonda de readiness que valida conexión activa con PostgreSQL."
+          }
+        }
+      ]
+    },
+    {
+      "name": "02. Autenticación y Perfil",
+      "item": [
+        {
+          "name": "Registrar Usuario (Auto-guarda JWT)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    var json = pm.response.json();",
+                  "    if (json.token) {",
+                  "        pm.environment.set('jwt_token', json.token);",
+                  "        console.log('JWT Token guardado:', json.token);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Carolina Donaire\",\n  \"email\": \"{{user_email}}\",\n  \"password\": \"{{user_password}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "register"]
+            },
+            "description": "Registra un nuevo usuario en la plataforma y guarda automáticamente el token JWT devuelto."
+          }
+        },
+        {
+          "name": "Iniciar Sesión (Auto-guarda JWT)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var json = pm.response.json();",
+                  "    if (json.token) {",
+                  "        pm.environment.set('jwt_token', json.token);",
+                  "        console.log('JWT Token actualizado tras Login:', json.token);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{user_email}}\",\n  \"password\": \"{{user_password}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "login"]
+            },
+            "description": "Inicia sesión con credenciales válidas y renueva la variable jwt_token."
+          }
+        },
+        {
+          "name": "Consultar Mi Perfil (/users/me)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users", "me"]
+            },
+            "description": "Consulta los datos del usuario autenticado vía token Bearer."
+          }
+        },
+        {
+          "name": "Actualizar Push Token de Expo",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pushToken\": \"ExponentPushToken[AbCdEf123456789]\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/users/push-token",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "users", "push-token"]
+            },
+            "description": "Asocia el token de notificaciones push de Expo al usuario autenticado."
+          }
+        }
+      ]
+    },
+    {
+      "name": "03. Gestión de Medicamentos",
+      "item": [
+        {
+          "name": "Crear Medicamento (Auto-guarda medication_id)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    var json = pm.response.json();",
+                  "    if (json.id) {",
+                  "        pm.environment.set('medication_id', json.id);",
+                  "        console.log('medication_id guardado:', json.id);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Amoxicilina 500mg\",\n  \"componentActive\": \"Amoxicilina Trihidrato\",\n  \"secondaryEffect\": \"Trastornos gastrointestinales leves, náuseas\",\n  \"withFood\": true,\n  \"dangerousInteractions\": \"Alopurinol, anticoagulantes orales\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/medications",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "medications"]
+            },
+            "description": "Registra un nuevo medicamento manual y almacena su ID en el entorno de Postman."
+          }
+        },
+        {
+          "name": "Listar Medicamentos (Paginado)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/medications?page=0&size=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "medications"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Consulta la lista paginada de medicamentos pertenecientes al usuario autenticado."
+          }
+        },
+        {
+          "name": "Buscar Medicamento por Nombre",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/medications?name=Amoxicilina",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "medications"],
+              "query": [
+                {
+                  "key": "name",
+                  "value": "Amoxicilina"
+                }
+              ]
+            },
+            "description": "Filtra medicamentos por coincidencia de texto en el nombre."
+          }
+        },
+        {
+          "name": "Consultar Detalle de Medicamento",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/medications/{{medication_id}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "medications", "{{medication_id}}"]
+            },
+            "description": "Obtiene la ficha completa de instrucciones e interacciones del medicamento."
+          }
+        },
+        {
+          "name": "Actualizar Medicamento",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Amoxicilina Clavulánico 500/125mg\",\n  \"componentActive\": \"Amoxicilina + Ácido Clavulánico\",\n  \"secondaryEffect\": \"Diarrea ocasional\",\n  \"withFood\": true,\n  \"dangerousInteractions\": \"Probenecid, anticonceptivos orales\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/medications/{{medication_id}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "medications", "{{medication_id}}"]
+            },
+            "description": "Modifica posología e instrucciones del medicamento existente."
+          }
+        },
+        {
+          "name": "Eliminar Medicamento",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/medications/{{medication_id}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "medications", "{{medication_id}}"]
+            },
+            "description": "Elimina el medicamento especificado (HTTP 204 No Content)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "04. Tratamientos y Control de Dosis",
+      "item": [
+        {
+          "name": "Crear Tratamiento (Genera Dosis Automáticas)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    var json = pm.response.json();",
+                  "    if (json.id) {",
+                  "        pm.environment.set('treatment_id', json.id);",
+                  "    }",
+                  "    if (json.doses && json.doses.length > 0) {",
+                  "        pm.environment.set('dose_id', json.doses[0].id);",
+                  "        console.log('Primera dosis guardada en dose_id:', json.doses[0].id);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"medicationId\": {{medication_id}},\n  \"startDate\": \"2026-10-10\",\n  \"endDate\": \"2026-10-14\",\n  \"intervalHours\": 8,\n  \"doseQuantity\": 1,\n  \"startTime\": \"08:00:00\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/treatments",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "treatments"]
+            },
+            "description": "Crea el tratamiento y genera automáticamente el cronograma de tomas en la tabla doses."
+          }
+        },
+        {
+          "name": "Consultar Tratamientos Activos",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/treatments?activeOnly=true",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "treatments"],
+              "query": [
+                {
+                  "key": "activeOnly",
+                  "value": "true"
+                }
+              ]
+            },
+            "description": "Devuelve la lista de tratamientos vigentes con sus dosis programadas y nombre del medicamento."
+          }
+        },
+        {
+          "name": "Marcar Dosis como Tomada (TAKEN)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"TAKEN\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/treatments/doses/{{dose_id}}/take",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "treatments", "doses", "{{dose_id}}", "take"]
+            },
+            "description": "Acción rápida del paciente para confirmar que ingirió la dosis programada."
+          }
+        },
+        {
+          "name": "Marcar Dosis como Saltada (SKIPPED)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"SKIPPED\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/treatments/doses/{{dose_id}}/take",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "treatments", "doses", "{{dose_id}}", "take"]
+            },
+            "description": "Marca la dosis como saltada u omitida."
+          }
+        }
+      ]
+    },
+    {
+      "name": "05. Escaneo Inteligente (IA)",
+      "item": [
+        {
+          "name": "Escanear Imagen de Medicamento (Multipart)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "image",
+                  "type": "file",
+                  "src": [],
+                  "description": "Adjunta un archivo de imagen (PNG, JPG o WEBP) de un prospecto o receta médica"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/scan/medication",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "scan", "medication"]
+            },
+            "description": "Envía una imagen a OpenAI Vision para extraer nombre, principio activo y posología estructurada."
+          }
+        }
+      ]
+    },
+    {
+      "name": "06. Verificación de Errores (RFC 7807)",
+      "item": [
+        {
+          "name": "Error 400: Validación de Registro (ProblemDetail)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"\",\n  \"email\": \"email-invalido\",\n  \"password\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "register"]
+            },
+            "description": "Verifica que el GlobalExceptionHandler retorne un objeto RFC 7807 con el desglose de campos erróneos."
+          }
+        },
+        {
+          "name": "Error 401: Credenciales Inválidas",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"inexistente@medscan.com\",\n  \"password\": \"password_erroneo\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "login"]
+            },
+            "description": "Verifica la respuesta 401 con detalle ProblemDetail ante credenciales incorrectas."
+          }
+        },
+        {
+          "name": "Error 404: Medicamento Inexistente",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/medications/999999",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "medications", "999999"]
+            },
+            "description": "Verifica respuesta 404 ProblemDetail al buscar un ID que no pertenece al usuario."
+          }
+        }
+      ]
+    }
+  ]
+}
