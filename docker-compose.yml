@@ -1,0 +1,89 @@
+services:
+  # ============================================================================
+  # Servicio de Base de Datos PostgreSQL 18
+  # ============================================================================
+  postgres:
+    image: postgres:18
+    container_name: medscan-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-medscan_db}
+      POSTGRES_USER: ${SPRING_DATASOURCE_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:-change_me}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - medscan-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${SPRING_DATASOURCE_USERNAME:-postgres} -d ${POSTGRES_DB:-medscan_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ============================================================================
+  # Servicio de Backend (Spring Boot 3 REST API en Java 25)
+  # ============================================================================
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: medscan-backend:latest
+    container_name: medscan-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+        restart: true
+    ports:
+      - "${SERVER_PORT:-8080}:8080"
+    environment:
+      # Conexión JDBC interna (apuntando al hostname 'postgres' de la red interna de Docker)
+      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL:-jdbc:postgresql://postgres:5432/medscan_db}
+      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:-postgres}
+      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:-change_me}
+      SERVER_PORT: 8080
+
+      # Seguridad y Tokens JWT
+      JWT_SECRET: ${JWT_SECRET:-change_me_jwt_secret_at_least_32_chars_prod_value}
+      JWT_EXPIRATION_MS: ${JWT_EXPIRATION_MS:-86400000}
+
+      # Integración con IA (OpenAI Vision / Chat)
+      SCAN_OPENAI_API_KEY: ${SCAN_OPENAI_API_KEY:-}
+      SCAN_OPENAI_MODEL: ${SCAN_OPENAI_MODEL:-gpt-4o-mini}
+      SCAN_OPENAI_URL: ${SCAN_OPENAI_URL:-https://api.openai.com/v1/chat/completions}
+      SCAN_OPENAI_TIMEOUT_MS: ${SCAN_OPENAI_TIMEOUT_MS:-15000}
+
+      # Notificaciones Push (Expo) y Planificador de Recordatorios
+      NOTIFICATION_EXPO_URL: ${NOTIFICATION_EXPO_URL:-https://exp.host/--/api/v2/push/send}
+      NOTIFICATION_REMINDER_DELAY_MS: ${NOTIFICATION_REMINDER_DELAY_MS:-60000}
+      NOTIFICATION_REMINDER_ADVANCE_MINUTES: ${NOTIFICATION_REMINDER_ADVANCE_MINUTES:-10}
+
+      # Opciones JVM para contenedores
+      JAVA_OPTS: "-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom"
+    networks:
+      - medscan-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8080/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+# ==============================================================================
+# Volúmenes Persistentes
+# ==============================================================================
+volumes:
+  postgres_data:
+    name: medscan_postgres_data
+
+# ==============================================================================
+# Redes Internas
+# ==============================================================================
+networks:
+  medscan-network:
+    name: medscan-network
+    driver: bridge
