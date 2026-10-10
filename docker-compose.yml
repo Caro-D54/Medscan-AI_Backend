@@ -41,6 +41,9 @@ services:
     ports:
       - "${SERVER_PORT:-8080}:8080"
     environment:
+      # Perfil de ejecución de Spring Boot (prod por defecto en Docker, dev para desarrollo local)
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+
       # Conexión JDBC interna (apuntando al hostname 'postgres' de la red interna de Docker)
       SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL:-jdbc:postgresql://postgres:5432/medscan_db}
       SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:-postgres}
