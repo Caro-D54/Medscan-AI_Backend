@@ -13,7 +13,11 @@ import java.util.List;
 @Repository
 public interface DoseRepo extends JpaRepository<Dose, Long> {
 
-    @Query("SELECT d FROM Dose d WHERE d.status = :status AND d.notifiedAt IS NULL AND d.scheduledAt <= :deadline")
+    @Query("SELECT d FROM Dose d " +
+           "JOIN FETCH d.treatment t " +
+           "JOIN FETCH t.user " +
+           "JOIN FETCH t.medicament " +
+           "WHERE d.status = :status AND d.notifiedAt IS NULL AND d.scheduledAt <= :deadline")
     List<Dose> findDueToNotify(@Param("status") DoseStatus status,
                                @Param("deadline") LocalDateTime deadline);
 }

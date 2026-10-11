@@ -151,7 +151,11 @@ jobs:
         env:
           AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
         run: |
-          az acr login --name ${{ secrets.ACR_NAME }}
+          if [ -n "${{ secrets.ACR_USERNAME }}" ] && [ -n "${{ secrets.ACR_PASSWORD }}" ]; then
+            echo "${{ secrets.ACR_PASSWORD }}" | docker login ${{ secrets.ACR_LOGIN_SERVER }} -u "${{ secrets.ACR_USERNAME }}" --password-stdin
+          else
+            az acr login --name ${{ secrets.ACR_NAME }}
+          fi
 
       # ------------------------------------------------------------------------
       # BUILD & PUSH DE LA IMAGEN DE PRODUCCIÓN AL REGISTRO
@@ -180,7 +184,10 @@ jobs:
           dns-name-label: medscan-api-${{ steps.meta.outputs.short_sha }}
           image: ${{ secrets.ACR_LOGIN_SERVER }}/medscan-backend:${{ steps.meta.outputs.tag_name }}
           name: medscan-backend-aci
-          location: 'eastus'
+          location: 'eastus2'
+          registry-login-server: ${{ secrets.ACR_LOGIN_SERVER }}
+          registry-username: ${{ secrets.ACR_USERNAME }}
+          registry-password: ${{ secrets.ACR_PASSWORD }}
           ports: 8080
           cpu: 1
           memory: 1.5
@@ -209,5 +216,5 @@ jobs:
           AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
         run: |
           echo "Verificando disponibilidad de la API desplegada en Azure..."
-          FQDN="medscan-api-${{ steps.meta.outputs.short_sha }}.eastus.azurecontainer.io"
+          FQDN="medscan-api-${{ steps.meta.outputs.short_sha }}.eastus2.azurecontainer.io"
           curl --retry 5 --retry-delay 10 --fail http://${FQDN}:8080/actuator/health || true

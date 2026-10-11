@@ -69,7 +69,13 @@ class DoseRepoTest {
         List<Dose> result = doseRepo.findDueToNotify(DoseStatus.PENDING, deadline);
 
         assertThat(result).hasSize(1);
-        assertThat(result.get(0).getStatus()).isEqualTo(DoseStatus.PENDING);
-        assertThat(result.get(0).getNotifiedAt()).isNull();
+        Dose foundDose = result.get(0);
+        assertThat(foundDose.getStatus()).isEqualTo(DoseStatus.PENDING);
+        assertThat(foundDose.getNotifiedAt()).isNull();
+        assertThat(foundDose.getTreatment()).isNotNull();
+        assertThat(foundDose.getTreatment().getUser()).isNotNull();
+        assertThat(foundDose.getTreatment().getUser().getEmail()).isEqualTo("caro@medscan.com");
+        assertThat(foundDose.getTreatment().getMedicament()).isNotNull();
+        assertThat(foundDose.getTreatment().getMedicament().getName()).isEqualTo("Acetaminophen");
     }
 }

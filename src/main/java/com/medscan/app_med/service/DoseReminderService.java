@@ -32,6 +32,7 @@ public class DoseReminderService {
         this.advanceMinutes = advanceMinutes;
     }
 
+    @Transactional
     public int sendDueReminders() {
         LocalDateTime deadline = LocalDateTime.now().plusMinutes(advanceMinutes);
         List<Dose> dueDoses = doseRepo.findDueToNotify(DoseStatus.PENDING, deadline);
