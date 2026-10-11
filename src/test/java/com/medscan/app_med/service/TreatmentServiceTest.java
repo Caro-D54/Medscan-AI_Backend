@@ -105,10 +105,52 @@ class TreatmentServiceTest {
                 LocalTime.of(8, 0), LocalTime.of(16, 0), LocalTime.of(0, 0),
                 LocalTime.of(8, 0), LocalTime.of(16, 0), LocalTime.of(0, 0));
 
+        List<java.time.LocalDateTime> dateTimes = saved.getDoses().stream()
+                .map(Dose::getScheduledAt)
+                .toList();
+        assertThat(dateTimes).containsExactly(
+                java.time.LocalDateTime.of(2026, 9, 1, 8, 0),
+                java.time.LocalDateTime.of(2026, 9, 1, 16, 0),
+                java.time.LocalDateTime.of(2026, 9, 2, 0, 0),
+                java.time.LocalDateTime.of(2026, 9, 2, 8, 0),
+                java.time.LocalDateTime.of(2026, 9, 2, 16, 0),
+                java.time.LocalDateTime.of(2026, 9, 3, 0, 0));
+        assertThat(dateTimes).isSorted();
+
         assertThat(saved.getDoses().stream().map(Dose::getStatus))
                 .containsOnly(DoseStatus.PENDING);
         assertThat(saved.getDoses().stream().map(Dose::getTreatment))
                 .containsOnly(saved);
+    }
+
+    @Test
+    void createTreatmentSchedulesInStrictChronologicalOrderWhenStartTimeCrossesMidnight() {
+        when(medicamentRepo.findByIdAndUser(5L, currentUser)).thenReturn(Optional.of(ownedMedicament()));
+        when(treatmentRepo.save(org.mockito.ArgumentMatchers.any(Treatment.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        CreateTreatmentRequest nightRequest = new CreateTreatmentRequest(
+                5L,
+                LocalDate.of(2026, 9, 1),
+                LocalDate.of(2026, 9, 2),
+                8,
+                1,
+                LocalTime.of(20, 0));
+
+        Treatment saved = treatmentService.createTreatment(nightRequest);
+
+        List<java.time.LocalDateTime> scheduledTimes = saved.getDoses().stream()
+                .map(Dose::getScheduledAt)
+                .toList();
+
+        assertThat(scheduledTimes).containsExactly(
+                java.time.LocalDateTime.of(2026, 9, 1, 20, 0),
+                java.time.LocalDateTime.of(2026, 9, 2, 4, 0),
+                java.time.LocalDateTime.of(2026, 9, 2, 12, 0),
+                java.time.LocalDateTime.of(2026, 9, 2, 20, 0),
+                java.time.LocalDateTime.of(2026, 9, 3, 4, 0),
+                java.time.LocalDateTime.of(2026, 9, 3, 12, 0));
+        assertThat(scheduledTimes).isSorted();
     }
 
     @Test
@@ -143,7 +185,68 @@ class TreatmentServiceTest {
                 LocalTime.of(8, 0));
 
         assertThatThrownBy(() -> treatmentService.createTreatment(invalid))
-                .isInstanceOf(InvalidTreatmentException.class);
+                .isInstanceOf(InvalidTreatmentException.class)
+                .hasMessageContaining("anterior a la de inicio");
+    }
+
+    @Test
+    void createTreatmentThrowsWhenDurationExceeds365Days() {
+        CreateTreatmentRequest tooLong = new CreateTreatmentRequest(
+                5L,
+                LocalDate.of(2026, 1, 1),
+                LocalDate.of(2027, 1, 5),
+                8,
+                1,
+                LocalTime.of(8, 0));
+
+        assertThatThrownBy(() -> treatmentService.createTreatment(tooLong))
+                .isInstanceOf(InvalidTreatmentException.class)
+                .hasMessageContaining("365 días");
+    }
+
+    @Test
+    void createTreatmentThrowsWhenIntervalHoursIsZeroOrNegative() {
+        CreateTreatmentRequest zeroInterval = new CreateTreatmentRequest(
+                5L,
+                LocalDate.of(2026, 9, 1),
+                LocalDate.of(2026, 9, 2),
+                0,
+                1,
+                LocalTime.of(8, 0));
+
+        assertThatThrownBy(() -> treatmentService.createTreatment(zeroInterval))
+                .isInstanceOf(InvalidTreatmentException.class)
+                .hasMessageContaining("al menos 1 hora");
+    }
+
+    @Test
+    void createTreatmentThrowsWhenIntervalHoursExceedsMax() {
+        CreateTreatmentRequest hugeInterval = new CreateTreatmentRequest(
+                5L,
+                LocalDate.of(2026, 9, 1),
+                LocalDate.of(2026, 9, 2),
+                200,
+                1,
+                LocalTime.of(8, 0));
+
+        assertThatThrownBy(() -> treatmentService.createTreatment(hugeInterval))
+                .isInstanceOf(InvalidTreatmentException.class)
+                .hasMessageContaining("168 horas");
+    }
+
+    @Test
+    void createTreatmentThrowsWhenDoseQuantityIsZeroOrNegative() {
+        CreateTreatmentRequest invalidQuantity = new CreateTreatmentRequest(
+                5L,
+                LocalDate.of(2026, 9, 1),
+                LocalDate.of(2026, 9, 2),
+                8,
+                0,
+                LocalTime.of(8, 0));
+
+        assertThatThrownBy(() -> treatmentService.createTreatment(invalidQuantity))
+                .isInstanceOf(InvalidTreatmentException.class)
+                .hasMessageContaining("cantidad por dosis");
     }
 
     @Test

@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -40,6 +41,20 @@ public class TreatmentService {
         if (request.endDate().isBefore(request.startDate())) {
             throw new InvalidTreatmentException("La fecha de fin no puede ser anterior a la de inicio");
         }
+        long days = ChronoUnit.DAYS.between(request.startDate(), request.endDate());
+        if (days > 365) {
+            throw new InvalidTreatmentException("La duración del tratamiento no puede exceder los 365 días");
+        }
+        if (request.intervalHours() <= 0) {
+            throw new InvalidTreatmentException("El intervalo entre dosis debe ser de al menos 1 hora");
+        }
+        if (request.intervalHours() > 168) {
+            throw new InvalidTreatmentException("El intervalo entre dosis no puede superar 168 horas (1 semana)");
+        }
+        if (request.doseQuantity() <= 0) {
+            throw new InvalidTreatmentException("La cantidad por dosis debe ser mayor a cero");
+        }
+
         Medicament medicament = medicamentRepo.findByIdAndUser(request.medicationId(), user)
                 .orElseThrow(MedicationNotFoundException::new);
 
@@ -82,28 +97,18 @@ public class TreatmentService {
     }
 
     private void scheduleDoses(Treatment treatment) {
-        List<LocalTime> dailyTimes = dailyTimes(treatment.getStartTime(), treatment.getIntervalHours());
-        LocalDate day = treatment.getStartDate();
-        while (!day.isAfter(treatment.getEndDate())) {
-            for (LocalTime time : dailyTimes) {
-                Dose dose = new Dose();
-                dose.setTreatment(treatment);
-                dose.setScheduledAt(LocalDateTime.of(day, time));
-                dose.setStatus(DoseStatus.PENDING);
-                treatment.getDoses().add(dose);
-            }
-            day = day.plusDays(1);
-        }
-    }
+        long totalDays = ChronoUnit.DAYS.between(treatment.getStartDate(), treatment.getEndDate()) + 1;
+        LocalDateTime current = LocalDateTime.of(treatment.getStartDate(), treatment.getStartTime());
+        LocalDateTime endLimit = current.plusDays(totalDays);
 
-    private List<LocalTime> dailyTimes(LocalTime startTime, int intervalHours) {
-        List<LocalTime> times = new ArrayList<>();
-        int offset = 0;
-        while (offset < 24) {
-            times.add(startTime.plusHours(offset));
-            offset += intervalHours;
+        while (current.isBefore(endLimit)) {
+            Dose dose = new Dose();
+            dose.setTreatment(treatment);
+            dose.setScheduledAt(current);
+            dose.setStatus(DoseStatus.PENDING);
+            treatment.getDoses().add(dose);
+            current = current.plusHours(treatment.getIntervalHours());
         }
-        return times;
     }
 
     private User currentUser() {
