@@ -34,4 +34,47 @@ class ExpoPushNotificationSenderTest {
 
         server.verify();
     }
+
+    @Test
+    void sendIncludesCategoryChannelAndDataWhenProvided() {
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        ExpoPushNotificationSender sender = new ExpoPushNotificationSender(
+                new ObjectMapper(), builder, "https://exp.host/--/api/v2/push/send");
+
+        java.util.Map<String, Object> data = new java.util.LinkedHashMap<>();
+        data.put("doseId", "10");
+        data.put("medicationId", "5");
+        data.put("url", "/medication/5");
+
+        server.expect(once(), requestTo("https://exp.host/--/api/v2/push/send"))
+                .andExpect(method(POST))
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(content().json("""
+                        [{
+                          "to": "expo-token-1",
+                          "title": "Hora de tu medicamento",
+                          "body": "Toma Acetaminophen",
+                          "categoryId": "dose-reminder",
+                          "channelId": "dose-reminders",
+                          "data": {
+                            "doseId": "10",
+                            "medicationId": "5",
+                            "url": "/medication/5"
+                          }
+                        }]
+                        """))
+                .andRespond(withSuccess());
+
+        sender.send(new PushNotification(
+                "expo-token-1",
+                "Hora de tu medicamento",
+                "Toma Acetaminophen",
+                "dose-reminder",
+                "dose-reminders",
+                data
+        ));
+
+        server.verify();
+    }
 }

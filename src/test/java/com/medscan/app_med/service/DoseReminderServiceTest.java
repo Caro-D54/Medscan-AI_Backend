@@ -47,9 +47,11 @@ class DoseReminderServiceTest {
         user.setPushToken(pushToken);
 
         Medicament medicament = new Medicament();
+        medicament.setId(5L);
         medicament.setName(medicationName);
 
         Treatment treatment = new Treatment();
+        treatment.setId(3L);
         treatment.setUser(user);
         treatment.setMedicament(medicament);
 
@@ -65,6 +67,8 @@ class DoseReminderServiceTest {
     void sendsReminderForEachDuePendingDoseWithToken() {
         Dose first = doseFor(DoseStatus.PENDING, "expo-token-1", "Acetaminophen");
         Dose second = doseFor(DoseStatus.PENDING, "expo-token-2", "Ibuprofen");
+        second.setId(11L);
+        second.getTreatment().getMedicament().setId(6L);
         when(doseRepo.findDueToNotify(any(), any())).thenReturn(List.of(first, second));
 
         int sent = doseReminderService.sendDueReminders();
@@ -74,12 +78,30 @@ class DoseReminderServiceTest {
 
         ArgumentCaptor<PushNotification> captor = ArgumentCaptor.forClass(PushNotification.class);
         verify(pushNotificationSender, times(2)).send(captor.capture());
-        assertThat(captor.getAllValues())
+        List<PushNotification> notifications = captor.getAllValues();
+        assertThat(notifications)
                 .extracting(PushNotification::token)
                 .containsExactly("expo-token-1", "expo-token-2");
-        assertThat(captor.getAllValues())
+        assertThat(notifications)
                 .extracting(PushNotification::body)
                 .containsExactly("Toma Acetaminophen", "Toma Ibuprofen");
+        assertThat(notifications)
+                .extracting(PushNotification::categoryId)
+                .containsExactly("dose-reminder", "dose-reminder");
+        assertThat(notifications)
+                .extracting(PushNotification::channelId)
+                .containsExactly("dose-reminders", "dose-reminders");
+
+        assertThat(notifications.get(0).data())
+                .containsEntry("doseId", "10")
+                .containsEntry("medicationId", "5")
+                .containsEntry("treatmentId", "3")
+                .containsEntry("url", "/medication/5");
+        assertThat(notifications.get(1).data())
+                .containsEntry("doseId", "11")
+                .containsEntry("medicationId", "6")
+                .containsEntry("treatmentId", "3")
+                .containsEntry("url", "/medication/6");
 
         assertThat(first.getNotifiedAt()).isNotNull();
         assertThat(second.getNotifiedAt()).isNotNull();

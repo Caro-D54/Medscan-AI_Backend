@@ -7,7 +7,7 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -41,10 +41,19 @@ public class ExpoPushNotificationSender implements PushNotificationSender {
     }
 
     private String buildRequest(PushNotification notification) {
-        Map<String, Object> message = new HashMap<>();
+        Map<String, Object> message = new LinkedHashMap<>();
         message.put("to", notification.token());
         message.put("title", notification.title());
         message.put("body", notification.body());
+        if (notification.categoryId() != null && !notification.categoryId().isBlank()) {
+            message.put("categoryId", notification.categoryId());
+        }
+        if (notification.channelId() != null && !notification.channelId().isBlank()) {
+            message.put("channelId", notification.channelId());
+        }
+        if (notification.data() != null && !notification.data().isEmpty()) {
+            message.put("data", notification.data());
+        }
         return writeJson(List.of(message));
     }
 
