@@ -103,4 +103,36 @@ class JwtAuthenticationFilterTest {
         assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
         verify(filterChain).doFilter(request, response);
     }
+
+    @Test
+    void returns401WhenJwtExceptionThrown() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader("Authorization", "Bearer invalid-or-expired-token");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        when(jwtService.extractEmail("invalid-or-expired-token"))
+                .thenThrow(new io.jsonwebtoken.MalformedJwtException("Invalid token"));
+
+        filter.doFilter(request, response, filterChain);
+
+        assertThat(response.getStatus()).isEqualTo(jakarta.servlet.http.HttpServletResponse.SC_UNAUTHORIZED);
+        assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+        verify(filterChain, never()).doFilter(request, response);
+    }
+
+    @Test
+    void returns401WhenUserNotFoundInDatabase() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader("Authorization", "Bearer valid-token-deleted-user");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        when(jwtService.extractEmail("valid-token-deleted-user")).thenReturn("deleted@medscan.com");
+        when(userRepo.findByEmail("deleted@medscan.com")).thenReturn(Optional.empty());
+
+        filter.doFilter(request, response, filterChain);
+
+        assertThat(response.getStatus()).isEqualTo(jakarta.servlet.http.HttpServletResponse.SC_UNAUTHORIZED);
+        assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
+        verify(filterChain, never()).doFilter(request, response);
+    }
 }

@@ -60,10 +60,10 @@ class SecurityIntegrationTest {
     }
 
     @Test
-    void protectedRouteWithInvalidTokenReturns403() throws Exception {
+    void protectedRouteWithInvalidTokenReturns401() throws Exception {
         mockMvc.perform(get("/api/v1/medications")
                         .header("Authorization", "Bearer not-a-valid-token"))
-                .andExpect(status().isForbidden());
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
