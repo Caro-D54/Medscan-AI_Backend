@@ -18,9 +18,23 @@ public class ExpoPushNotificationSender implements PushNotificationSender {
     private final RestClient restClient;
     private final String url;
 
+    @org.springframework.beans.factory.annotation.Autowired
     public ExpoPushNotificationSender(ObjectMapper objectMapper,
                                       RestClient.Builder restClientBuilder,
-                                      @Value("${notification.expo.url:https://exp.host/--/api/v2/push/send}") String url) {
+                                      @Value("${notification.expo.url:${app.notification.expo.url:https://exp.host/--/api/v2/push/send}}") String url,
+                                      @Value("${notification.expo.timeout-ms:${app.notification.expo.timeout-ms:10000}}") int timeoutMs) {
+        this.objectMapper = objectMapper;
+        org.springframework.http.client.SimpleClientHttpRequestFactory requestFactory =
+                new org.springframework.http.client.SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(timeoutMs);
+        requestFactory.setReadTimeout(timeoutMs);
+        this.restClient = restClientBuilder.requestFactory(requestFactory).build();
+        this.url = url;
+    }
+
+    public ExpoPushNotificationSender(ObjectMapper objectMapper,
+                                      RestClient.Builder restClientBuilder,
+                                      String url) {
         this.objectMapper = objectMapper;
         this.restClient = restClientBuilder.build();
         this.url = url;
