@@ -45,6 +45,9 @@ public class MedicationService {
         existing.setSecondaryEffect(medicament.getSecondaryEffect());
         existing.setWithFood(medicament.isWithFood());
         existing.setDangerousInteractions(medicament.getDangerousInteractions());
+        existing.setDosage(medicament.getDosage());
+        existing.setFrequency(medicament.getFrequency());
+        existing.setInstructions(medicament.getInstructions());
         return medicamentRepo.save(existing);
     }
 

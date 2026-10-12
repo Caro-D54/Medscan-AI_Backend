@@ -36,6 +36,13 @@ public class Medicament {
     @Column(length = 1000)
     private String dangerousInteractions;
 
+    private String dosage;
+
+    private String frequency;
+
+    @Column(length = 1000)
+    private String instructions;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "user_id")
     @JsonIgnore

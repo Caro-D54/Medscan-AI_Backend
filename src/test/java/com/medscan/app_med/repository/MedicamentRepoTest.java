@@ -104,4 +104,22 @@ class MedicamentRepoTest {
                 .containsExactly("Amoxicillin");
         assertThat(result.getTotalElements()).isEqualTo(1);
     }
+
+    @Test
+    void posologyFieldsArePersistedAndRetrieved() {
+        User user = saveUser("posology@medscan.com");
+        Medicament med = new Medicament();
+        med.setName("Amoxicilina");
+        med.setUser(user);
+        med.setDosage("500mg");
+        med.setFrequency("cada 8 horas");
+        med.setInstructions("Tomar después de las comidas");
+        Medicament saved = medicamentRepo.save(med);
+
+        Optional<Medicament> found = medicamentRepo.findByIdAndUser(saved.getId(), user);
+        assertThat(found).isPresent();
+        assertThat(found.get().getDosage()).isEqualTo("500mg");
+        assertThat(found.get().getFrequency()).isEqualTo("cada 8 horas");
+        assertThat(found.get().getInstructions()).isEqualTo("Tomar después de las comidas");
+    }
 }

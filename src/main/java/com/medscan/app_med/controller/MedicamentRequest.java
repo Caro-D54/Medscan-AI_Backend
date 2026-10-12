@@ -25,6 +25,9 @@ public record MedicamentRequest(
 
         m.setWithFood(withFood);
         m.setDangerousInteractions(dangerousInteractions);
+        m.setDosage(dosage != null && !dosage.isBlank() ? dosage : componentActive);
+        m.setFrequency(frequency);
+        m.setInstructions(instructions != null && !instructions.isBlank() ? instructions : secondaryEffect);
         return m;
     }
 }
