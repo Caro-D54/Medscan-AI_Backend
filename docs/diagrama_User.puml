@@ -1,0 +1,114 @@
+@startuml MedScan_AI_Class_Diagram
+
+' --- Configuración Estética ---
+skinparam classAttributeIconSize 0
+skinparam backgroundColor #FFFFFF
+skinparam RoundCorner 8
+skinparam Shadowing true
+
+skinparam class {
+    BackgroundColor #FFFFFF
+    BorderColor #2C3E50
+    ArrowColor #2980B9
+    HeaderBackgroundColor #ECF0F1
+}
+
+' --- Capa de Controladores (Spring REST) ---
+package "Controllers (API REST)" #EBF5FB {
+    class PacienteController {
+        + obtenerTratamientos(pacienteId: Long): ResponseEntity<List<TratamientoDTO>>
+    }
+
+    class MedicamentoController {
+        + escanearMedicamento(imagen: MultipartFile): ResponseEntity<MedicamentoDTO>
+        + verificarInteraccion(med1Id: Long, med2Id: Long): ResponseEntity<InteraccionDTO>
+    }
+
+    class TratamientoController {
+        + crearTratamiento(dto: CrearTratamientoDTO): ResponseEntity<TratamientoDTO>
+        + obtenerHorariosProximos(pacienteId: Long): ResponseEntity<List<HorarioDTO>>
+    }
+}
+
+' --- Capa de Servicios ---
+package "Services (Lógica de Negocio)" #E8F8F5 {
+    class MedicamentoService {
+        + procesarImagen(imagen: byte[]): Medicamento
+        + evaluarCompatibilidad(medicamentos: List<Medicamento>): List<Interaccion>
+    }
+
+    class TratamientoService {
+        + programarTomas(tratamiento: Tratamiento): List<HorarioToma>
+        + obtenerProximasTomas(pacienteId: Long): List<HorarioToma>
+    }
+}
+
+' --- Capa de Repositorios (Persistencia JPA) ---
+package "Repositories (Spring Data JPA)" #FEF9E7 {
+    interface PacienteRepository <<Interface>>
+    interface MedicamentoRepository <<Interface>>
+    interface TratamientoRepository <<Interface>>
+    interface HorarioTomaRepository <<Interface>>
+}
+
+' --- Capa de Dominio (Entidades de BD PostgreSQL) ---
+package "Domain Models (Entidades JPA)" #F4F6F7 {
+    class Paciente {
+        - id: Long
+        - nombre: String
+        - email: String
+        - fechaNacimiento: LocalDate
+    }
+
+    class Medicamento {
+        - id: Long
+        - nombreComercial: String
+        - principioActivo: String
+        - indicacionesComida: String
+    }
+
+    class Tratamiento {
+        - id: Long
+        - fechaInicio: LocalDate
+        - fechaFin: LocalDate
+        - frecuenciaHoras: Integer
+    }
+
+    class HorarioToma {
+        - id: Long
+        - horaProgramada: LocalDateTime
+        - completado: Boolean
+    }
+
+    class Interaccion {
+        - id: Long
+        - descripcion: String
+        - nivelRiesgo: NivelRiesgo
+    }
+
+    enum NivelRiesgo {
+        BAJO
+        MEDIO
+        ALTO
+        CRITICO
+    }
+}
+
+' --- Relaciones entre Capas (Clean Architecture) ---
+PacienteController --> TratamientoService
+MedicamentoController --> MedicamentoService
+TratamientoController --> TratamientoService
+
+MedicamentoService --> MedicamentoRepository
+TratamientoService --> TratamientoRepository
+TratamientoService --> HorarioTomaRepository
+
+' --- Relaciones del Modelo de Datos (ORM) ---
+Paciente "1" *-- "0..*" Tratamiento : tiene >
+Medicamento "1" <-- "0..*" Tratamiento : recetado en <
+Tratamiento "1" *-- "1..*" HorarioToma : contiene >
+Medicamento "1" -- "0..*" Interaccion : origen >
+Medicamento "1" -- "0..*" Interaccion : destino >
+Interaccion --> NivelRiesgo : nivel
+
+@enduml

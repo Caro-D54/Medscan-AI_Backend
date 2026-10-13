@@ -1,0 +1,56 @@
+# ==============================================================================
+# .dockerignore para MedScan AI (Spring Boot / Maven)
+# Optimiza el contexto de construcción excluyendo artefactos y archivos locales.
+# ==============================================================================
+
+# Artefactos de compilación de Maven
+target/
+*.jar
+*.war
+*.ear
+
+# Control de versiones
+.git/
+.gitignore
+.gitattributes
+.github/
+
+# Entornos de desarrollo e IDEs
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+.project
+.classpath
+.settings/
+
+# Archivos de entorno y secretos locales (NUNCA incluir en la imagen)
+.env
+.env.*
+!.env.example
+
+# Documentación, diagramas y colecciones de prueba
+docs/
+*.md
+postman/
+.postman/
+
+# Scripts locales de desarrollo
+boot.ps1
+
+# Archivos propios de Docker (evitar recreación de capas innecesarias)
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# Archivos temporales y de sistema operativo
+.DS_Store
+Thumbs.db
+tmp/
+temp/
+logs/
+*.log
+
+# Exclusión de binarios pesados de wrapper, preservando el archivo de propiedades necesario para mvnw
+.mvn/wrapper/*.jar

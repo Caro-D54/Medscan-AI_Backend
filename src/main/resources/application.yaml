@@ -1,15 +1,67 @@
 spring:
   application:
     name: app-med
-  datasource:
-    url: jdbc:postgresql://localhost:5432/medscan_db
-    username: postgres
-    password: 12345_Caro
-    driver-class-name: org.postgresql.Driver
-  jpa:
-    hibernate:
-      ddl-auto: update
-    show-sql: true
-    properties:
-      hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+
+  # Configuración común de Jackson
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+
+  # Configuración de apagado controlado (Factor IX: Disposability)
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
+
+  # Control de migraciones con Flyway (Factor X & XII)
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    locations: classpath:db/migration
+
+# Servidor HTTP con Graceful Shutdown
+server:
+  port: ${SERVER_PORT:8080}
+  shutdown: graceful
+
+# Monitoreo de salud, métricas y probes de Kubernetes/Docker (Factor IV, IX & XI)
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+      probes:
+        enabled: true
+
+# Configuración de Integraciones del Sistema
+app:
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:*}
+  jwt:
+    secret: ${JWT_SECRET:change_me_jwt_secret_at_least_32_chars}
+    expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+  scan:
+    openai:
+      api-key: ${SCAN_OPENAI_API_KEY:}
+      model: ${SCAN_OPENAI_MODEL:gpt-4o-mini}
+      url: ${SCAN_OPENAI_URL:https://api.openai.com/v1/chat/completions}
+      timeout-ms: ${SCAN_OPENAI_TIMEOUT_MS:15000}
+  notification:
+    expo:
+      url: ${NOTIFICATION_EXPO_URL:https://exp.host/--/api/v2/push/send}
+      timeout-ms: ${NOTIFICATION_EXPO_TIMEOUT_MS:10000}
+    reminder:
+      delay-ms: ${NOTIFICATION_REMINDER_DELAY_MS:60000}
+      advance-minutes: ${NOTIFICATION_REMINDER_ADVANCE_MINUTES:10}
+
+# Fallback para compatibilidad con inyecciones directas @Value("${notification...}")
+notification:
+  expo:
+    url: ${NOTIFICATION_EXPO_URL:https://exp.host/--/api/v2/push/send}
+    timeout-ms: ${NOTIFICATION_EXPO_TIMEOUT_MS:10000}
+  reminder:
+    delay-ms: ${NOTIFICATION_REMINDER_DELAY_MS:60000}
+    advance-minutes: ${NOTIFICATION_REMINDER_ADVANCE_MINUTES:10}

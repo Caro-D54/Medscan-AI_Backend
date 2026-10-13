@@ -31,3 +31,18 @@ build/
 
 ### VS Code ###
 .vscode/
+*.code-workspace
+
+### Environment ###
+.env
+.env.*
+!.env.example
+
+### Configuración local sensible ###
+application-dev.yaml
+application-dev.yml
+boot.ps1
+
+### Compiled Class Files ###
+*.class
+
