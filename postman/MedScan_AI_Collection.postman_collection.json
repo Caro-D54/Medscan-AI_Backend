@@ -60,6 +60,62 @@
             },
             "description": "Sonda de readiness que valida conexión activa con PostgreSQL."
           }
+        },
+        {
+          "name": "Metrics - Catálogo Completo (12-Factor)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/actuator/metrics",
+              "host": ["{{baseUrl}}"],
+              "path": ["actuator", "metrics"]
+            },
+            "description": "Lista todas las métricas de telemetría expuestas por Spring Boot Actuator."
+          }
+        },
+        {
+          "name": "Metrics - Historial HTTP Requests",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/actuator/metrics/http.server.requests",
+              "host": ["{{baseUrl}}"],
+              "path": ["actuator", "metrics", "http.server.requests"]
+            },
+            "description": "Muestra el historial de peticiones HTTP (cantidad, tiempo total y latencia máxima)."
+          }
+        },
+        {
+          "name": "Metrics - Uso de Memoria JVM",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/actuator/metrics/jvm.memory.used",
+              "host": ["{{baseUrl}}"],
+              "path": ["actuator", "metrics", "jvm.memory.used"]
+            },
+            "description": "Muestra los bytes de memoria RAM utilizados actualmente por la JVM en el contenedor."
+          }
+        },
+        {
+          "name": "Metrics - Uptime del Contenedor",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/actuator/metrics/process.uptime",
+              "host": ["{{baseUrl}}"],
+              "path": ["actuator", "metrics", "process.uptime"]
+            },
+            "description": "Muestra el tiempo activo ininterrumpido (en segundos) de la instancia desplegada."
+          }
         }
       ]
     },

@@ -333,4 +333,16 @@ class SecurityIntegrationTest {
         mockMvc.perform(get("/actuator/health/readiness"))
                 .andExpect(status().isOk());
     }
+
+    @Test
+    void metricsEndpointIsPublicAndReturnsTelemetry() throws Exception {
+        mockMvc.perform(get("/actuator/metrics"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.names").isArray());
+
+        mockMvc.perform(get("/actuator/metrics/jvm.memory.used"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("jvm.memory.used"))
+                .andExpect(jsonPath("$.measurements").isArray());
+    }
 }

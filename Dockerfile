@@ -26,9 +26,28 @@ COPY src ./src
 RUN ./mvnw clean package -DskipTests -B
 
 # ------------------------------------------------------------------------------
-# 2. RUNTIME STAGE: Entorno de ejecución ultra liviano con JRE 25 (Alpine)
+# 2. DEVELOPMENT STAGE: Imagen para Desarrollo (JDK 25 completo + Hot-Reload / Debug)
+#    Construcción: docker build --target development -t medscan-backend:dev .
 # ------------------------------------------------------------------------------
-FROM eclipse-temurin:25-jre-alpine AS runtime
+FROM builder AS development
+
+LABEL maintainer="MedScan AI DevOps Team" \
+      description="MedScan AI Backend REST API - Development Container (JDK 25 + Debug)"
+
+ENV SPRING_PROFILES_ACTIVE=dev \
+    SPRING_OUTPUT_ANSI_ENABLED=ALWAYS \
+    JAVA_TOOL_OPTIONS="-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005"
+
+# Exponer puerto HTTP (8080) y puerto de depuración remota JVM (5005)
+EXPOSE 8080 5005
+
+CMD ["./mvnw", "spring-boot:run"]
+
+# ------------------------------------------------------------------------------
+# 3. PRODUCTION STAGE (Default): Imagen para Producción ultra liviana con JRE 25 (Alpine)
+#    Construcción: docker build --target production -t medscan-backend:prod .
+# ------------------------------------------------------------------------------
+FROM eclipse-temurin:25-jre-alpine AS production
 
 LABEL maintainer="MedScan AI DevOps Team" \
       description="MedScan AI Backend REST API - Production Container"
@@ -43,6 +62,7 @@ WORKDIR /app
 # - MaxRAMPercentage=75: Asigna hasta el 75% de la memoria del contenedor a la JVM
 # - java.security.egd: Acelera la generación de entropía segura para JWT
 ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom" \
+    SPRING_PROFILES_ACTIVE=prod \
     SPRING_OUTPUT_ANSI_ENABLED=ALWAYS
 
 # Copiar el artefacto generado desde la etapa builder asignando permisos al usuario sin privilegios

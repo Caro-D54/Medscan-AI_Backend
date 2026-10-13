@@ -24,14 +24,15 @@ server:
   port: ${SERVER_PORT:8080}
   shutdown: graceful
 
-# Monitoreo de salud y probes de Kubernetes/Docker (Factor IV & IX)
+# Monitoreo de salud, métricas y probes de Kubernetes/Docker (Factor IV, IX & XI)
 management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,metrics
   endpoint:
     health:
+      show-details: always
       probes:
         enabled: true
 
