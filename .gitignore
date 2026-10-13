@@ -39,8 +39,8 @@ build/
 !.env.example
 
 ### Configuración local sensible ###
-application-dev.yaml
-application-dev.yml
+application-local.yaml
+application-local.yml
 boot.ps1
 
 ### Compiled Class Files ###
