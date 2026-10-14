@@ -575,6 +575,182 @@
           }
         }
       ]
+    },
+    {
+      "name": "07. Panel de Administrador (Role ADMIN)",
+      "item": [
+        {
+          "name": "Iniciar Sesión como Admin (Auto-guarda admin_jwt_token)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var json = pm.response.json();",
+                  "    if (json.token) {",
+                  "        pm.environment.set('admin_jwt_token', json.token);",
+                  "        console.log('Token de Admin guardado:', json.token);",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{admin_email}}\",\n  \"password\": \"{{admin_password}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "auth", "login"]
+            },
+            "description": "Inicia sesión con credenciales de administrador (admin_user@test.com / 12345_admin) y auto-guarda el token en {{admin_jwt_token}}."
+          }
+        },
+        {
+          "name": "Métricas del Sistema (Admin)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/metrics",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "metrics"]
+            },
+            "description": "Obtiene las métricas agregadas del sistema (total de usuarios, altas en 7 y 30 días, medicamentos, tratamientos, dosis y uptime)."
+          }
+        },
+        {
+          "name": "Listar Usuarios - Paginado (Admin)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/users?page=0&size=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "users"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Lista usuarios registrados de forma paginada y ordenada por ID, excluyendo contraseñas."
+          }
+        },
+        {
+          "name": "Buscar Usuarios por Nombre o Email (Admin)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/users?search=paciente",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "users"],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "paciente"
+                }
+              ]
+            },
+            "description": "Busca usuarios cuyos nombres o emails contengan la cadena especificada."
+          }
+        },
+        {
+          "name": "Eliminar Usuario (Admin)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{admin_jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/users/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "users", "1"]
+            },
+            "description": "Elimina un usuario por su ID. La lógica previene la autoeliminación del administrador retornando 400 Bad Request."
+          }
+        },
+        {
+          "name": "Error 403: Acceso Denegado a Métricas (Usuario Regular)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/metrics",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "metrics"]
+            },
+            "description": "Verifica que un usuario común (rol USER) reciba HTTP 403 Prohibido al intentar acceder a /api/admin/metrics."
+          }
+        }
+      ]
     }
   ]
 }

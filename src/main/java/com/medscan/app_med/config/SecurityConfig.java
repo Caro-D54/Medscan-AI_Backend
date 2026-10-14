@@ -1,6 +1,7 @@
 package com.medscan.app_med.config;
 
 import com.medscan.app_med.security.JwtAuthenticationFilter;
+import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -37,13 +38,15 @@ public class SecurityConfig {
             .cors(Customizer.withDefaults())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/v1/auth/**", "/swagger-ui/**", "/v3/api-docs/**", "/actuator/health/**", "/actuator/info", "/actuator/metrics/**").permitAll()
+                        .dispatcherTypeMatchers(DispatcherType.FORWARD, DispatcherType.ERROR).permitAll()
+                        .requestMatchers("/api/v1/auth/**", "/error", "/swagger-ui/**", "/v3/api-docs/**", "/actuator/health/**", "/actuator/info", "/actuator/metrics/**").permitAll()
+                        .requestMatchers("/api/v1/admin/**", "/api/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
                 .exceptionHandling(handling -> handling
                         .authenticationEntryPoint((request, response, ex) ->
                                 response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "No autorizado"))
                         .accessDeniedHandler((request, response, ex) ->
-                                response.sendError(HttpServletResponse.SC_FORBIDDEN, "Prohibido")))
+                                response.sendError(HttpServletResponse.SC_FORBIDDEN, "Prohibido: Se requiere rol de Administrador")))
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
