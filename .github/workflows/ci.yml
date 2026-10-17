@@ -28,7 +28,7 @@ jobs:
         ports:
           - 5432:5432
         options: >-
-          --health-cmd pg_isready
+          --health-cmd "pg_isready -U postgres -d medscan_db"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -49,10 +49,7 @@ jobs:
 
       - name: Compilación, verificación y pruebas unitarias/integración
         env:
-          SPRING_PROFILES_ACTIVE: dev
-          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/medscan_db
-          SPRING_DATASOURCE_USERNAME: postgres
-          SPRING_DATASOURCE_PASSWORD: postgres
+          SPRING_PROFILES_ACTIVE: test
           JWT_SECRET: test_jwt_secret_at_least_32_characters_long_123456
           SCAN_OPENAI_API_KEY: test_key
         run: ./mvnw -B clean verify
