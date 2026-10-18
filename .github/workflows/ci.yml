@@ -229,6 +229,30 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
+      - name: Validar registro del proveedor Microsoft.ContainerInstance en Azure
+        if: steps.semver.outputs.should_deploy == 'true' && env.AZURE_CREDENTIALS != ''
+        run: |
+          echo "Verificando registro del proveedor Microsoft.ContainerInstance..."
+          STATE=$(az provider show --namespace Microsoft.ContainerInstance --query registrationState -o tsv 2>/dev/null || echo "NotRegistered")
+          echo "Estado actual: ${STATE}"
+          if [ "${STATE}" != "Registered" ]; then
+            echo "Registrando namespace Microsoft.ContainerInstance..."
+            az provider register --namespace Microsoft.ContainerInstance
+            for i in $(seq 1 30); do
+              STATE=$(az provider show --namespace Microsoft.ContainerInstance --query registrationState -o tsv 2>/dev/null || echo "Registering")
+              echo "Intento $i: Estado es ${STATE}"
+              if [ "${STATE}" = "Registered" ]; then
+                break
+              fi
+              sleep 5
+            done
+          fi
+          if [ "${STATE}" != "Registered" ]; then
+            echo "::warning::El proveedor Microsoft.ContainerInstance aún está en estado '${STATE}'."
+          else
+            echo "Proveedor Microsoft.ContainerInstance verificado exitosamente (Registered)."
+          fi
+
       # ------------------------------------------------------------------------
       # DESPLIEGUE CONTINUO EN AZURE CONTAINER INSTANCES (ACI)
       # ------------------------------------------------------------------------
