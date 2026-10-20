@@ -120,6 +120,7 @@ El pipeline `.github/workflows/ci.yml` se ejecuta en `push` a `main`/`develop` y
 1. **Build, tests y Snyk** (SCA/SAST) con `./mvnw -B clean verify` sobre Java 25.
 2. **Docker build y Grype** para detectar vulnerabilidades en la imagen.
 3. **Versionado semántico (`vX.Y.Z`) y despliegue** a Azure Container Instances, con verificación de `/actuator/health`.
+4. El resumen del despliegue en GitHub Actions incluye enlaces directos de Azure Portal a los logs y métricas de ACI y al repositorio de imágenes de ACR.
 
 Para subir la imagen a Azure Container Registry manualmente usa `upload_to_acr.py` (lee las variables de `.env`). Los comandos de referencia de Azure CLI están en [`docs/azure_comands.md`](docs/azure_comands.md).
 
