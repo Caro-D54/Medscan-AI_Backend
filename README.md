@@ -118,7 +118,14 @@ En `postman/` hay una colección con entornos `Local` y `Azure` para probar la A
 La integración y el despliegue continuo se encuentran desacoplados en workflows independientes según el principio de responsabilidad única (Clean Architecture / Separation of Concerns):
 
 1. **Integración Continua (`.github/workflows/ci.yml`)**:
-   - Se ejecuta en `push` a `main`/`develop` y en `pull_request` a `main`.
+   - Se ejecuta en `push` a `main`/`develop` y en `pull_request` a `main`, **filtrado por rutas (`paths`)** para optimizar el consumo de minutos de Actions:
+     * **Archivos que disparan el pipeline**:
+       - `**/*.java`: Cualquier cambio en código fuente de producción o pruebas unitarias/integración.
+       - `pom.xml`: Cambios en dependencias, plugins o versiones de librerías (auditoría SCA con Snyk).
+       - `src/main/resources/**` y `src/test/resources/**`: Configuraciones de Spring (`application*.yaml`) y scripts de migración Flyway.
+       - `Dockerfile`: Cambios en la imagen base o capas del contenedor (análisis de vulnerabilidades con Grype).
+       - `.github/workflows/ci.yml`: Ajustes directos en el flujo de CI.
+     * **Archivos omitidos (no consumen minutos de CI/CD)**: `README.md`, `docs/**`, `.gitignore`, `.dockerignore`, `boot.ps1` y colecciones de `postman/**`.
    - **Build & Tests**: Compila y ejecuta todos los tests unitarios y de integración con `./mvnw -B clean verify` sobre Java 25 y contenedor PostgreSQL.
    - **Snyk (SCA & SAST)**: Analiza vulnerabilidades en dependencias Maven.
    - **Grype**: Escanea vulnerabilidades en capas base de contenedores Docker (`anchore/scan-action`).

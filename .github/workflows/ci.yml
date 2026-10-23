@@ -3,8 +3,24 @@ name: CI Pipeline - MedScan AI Backend
 on:
   push:
     branches: [main, develop]
+    # Filtro de paths: solo ejecuta el pipeline cuando el commit modifica código Java,
+    # dependencias o configuraciones críticas de ejecución del backend (Issue #22)
+    paths:
+      - '**/*.java'
+      - 'pom.xml'
+      - 'src/main/resources/**'
+      - 'src/test/resources/**'
+      - 'Dockerfile'
+      - '.github/workflows/ci.yml'
   pull_request:
     branches: [main]
+    paths:
+      - '**/*.java'
+      - 'pom.xml'
+      - 'src/main/resources/**'
+      - 'src/test/resources/**'
+      - 'Dockerfile'
+      - '.github/workflows/ci.yml'
 
 permissions:
   contents: read
