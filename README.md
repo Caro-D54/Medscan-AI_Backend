@@ -133,8 +133,20 @@ La integración y el despliegue continuo se encuentran desacoplados en workflows
 
 2. **Despliegue Continuo (`.github/workflows/cd.yml`)**:
    - Se dispara únicamente tras la finalización exitosa del CI (`workflow_run` sobre `CI Pipeline - MedScan AI Backend`). Un fallo en CI bloquea por completo el CD.
-   - **Versionado Semántico (`vX.Y.Z`)**: Calcula la versión según Conventional Commits (`feat` -> Y, `fix`/`refactor` -> Z, `doc`/`chore` -> omitir).
-   - **Publicación en ACR**: Construye y sube la imagen de producción al Azure Container Registry mediante Service Principal (`upload_to_acr.py`).
+   - **Versionado Semántico Automático y Despliegue Condicionado (Issue #23)**:
+     Analiza el commit mediante la expresión regular `^(feat|fix|refactor|docs?|chore)(\([^)]+\))?:` para calcular la versión y condicionar el release:
+
+     | Tipo de commit | Efecto en versión | ¿Genera versión/tag? | ¿Construye imagen y despliega? |
+     | :--- | :---: | :---: | :---: |
+     | `feat(scope)` / `feat` | `vX.Y+1.0` (MINOR) | ✅ Sí | ✅ Sí |
+     | `fix(scope)` / `fix` | `vX.Y.Z+1` (PATCH) | ✅ Sí | ✅ Sí |
+     | `refactor(scope)` / `refactor` | `vX.Y.Z+1` (PATCH) | ✅ Sí | ✅ Sí |
+     | `doc(scope)` / `docs(scope)` | Sin cambio (`-`) | ❌ No | ❌ No |
+     | `chore(scope)` / `chore` | Sin cambio (`-`) | ❌ No | ❌ No |
+     | *Formato no convencional* | Sin cambio (`-`) | ❌ No | ❌ No (Advierte en log y omite deploy) |
+
+     *Prevención de bucles infinitos*: `ci.yml` filtra únicamente ramas (`branches: [main, develop]`) y no tags (`refs/tags/*`); por ende, la publicación de un nuevo tag Git no desencadena una nueva ejecución del pipeline.
+   - **Publicación en ACR**: Construye la imagen de producción etiquetada con la versión calculada (`vX.Y.Z`) y la sube al Azure Container Registry mediante Service Principal (`upload_to_acr.py`).
    - **Aprovisionamiento en ACI**: Despliega o actualiza la instancia en Azure Container Instances validando pre-registro de `Microsoft.ContainerInstance`.
    - **Smoke Tests & 12-Factor App**: Valida telemetría, métricas y estado de salud en vivo (`/actuator/health` y `/actuator/metrics`).
    - *Nota de seguridad*: Todos los secretos de infraestructura residen exclusivamente en este workflow y se leen desde GitHub Secrets.
