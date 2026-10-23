@@ -132,6 +132,13 @@ La integración y el despliegue continuo se encuentran desacoplados en workflows
    - **Smoke Tests & 12-Factor App**: Valida telemetría, métricas y estado de salud en vivo (`/actuator/health` y `/actuator/metrics`).
    - *Nota de seguridad*: Todos los secretos de infraestructura residen exclusivamente en este workflow y se leen desde GitHub Secrets.
 
+3. **Monitoreo Continuo y Salud del Servicio (`.github/workflows/monitor.yml`)**:
+   - Se ejecuta de manera programada cada 30 minutos (`schedule` cron) y bajo demanda (`workflow_dispatch`).
+   - **Health Check Activo**: Realiza peticiones a `/actuator/health` y falla estrictamente si el código HTTP no es `200` o la aplicación no reporta estado `UP`.
+   - **Telemetría y Probes (12-Factor App)**: Consulta `/actuator/health/liveness`, `/actuator/health/readiness` y métricas clave (`process.uptime`).
+   - **Notificación Inteligente de Incidentes**: En caso de caída, crea o actualiza automáticamente una issue de alerta en GitHub (`🚨 [ALERTA] Fallo de Disponibilidad...`) con etiquetas y detalles de diagnóstico. Si el servicio se recupera, la alerta se resuelve y auto-cierra.
+   - *Nota de seguridad*: Enmascara dinámicamente (`::add-mask::`) las URLs y tokens para evitar exponer endpoints o datos sensibles en los logs de ejecución.
+
 Para subir la imagen a Azure Container Registry manualmente usa `upload_to_acr.py` (lee las variables de `.env`). Los comandos de referencia de Azure CLI están en [`docs/azure_comands.md`](docs/azure_comands.md).
 
 ## 📚 Documentación Adicional

@@ -1,0 +1,254 @@
+name: Service Monitoring & Health Check
+
+on:
+  schedule:
+    # Se ejecuta periódicamente cada 30 minutos (cron: '*/30 * * * *')
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+    inputs:
+      target_url:
+        description: 'URL base del servicio a monitorear (opcional, si se omite usa secretos o ACI)'
+        required: false
+        default: ''
+      timeout_seconds:
+        description: 'Timeout máximo por petición HTTP en segundos'
+        required: false
+        default: '15'
+
+permissions:
+  contents: read
+  issues: write # Necesario para crear/actualizar issues automáticas de alerta ante incidentes
+
+concurrency:
+  group: monitoring-${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  # ============================================================================
+  # MONITOREO DE DISPONIBILIDAD, SALUD Y MÉTRICAS DEL SERVICIO DESPLEGADO
+  # ============================================================================
+  monitor-service:
+    name: Health Check & Availability Monitoring
+    runs-on: ubuntu-latest
+
+    steps:
+      # ------------------------------------------------------------------------
+      # 1. RESOLUCIÓN SEGURA Y ENMASCARAMIENTO DE LA URL OBJETIVO
+      # Principio: No exponer URLs, dominios ni tokens sensibles en logs (Secret Masking)
+      # ------------------------------------------------------------------------
+      - name: Resolver y enmascarar URL objetivo de monitoreo
+        id: resolve-url
+        env:
+          INPUT_URL: ${{ github.event.inputs.target_url }}
+          SECRET_API_URL: ${{ secrets.MEDSCAN_API_URL || secrets.SERVICE_URL }}
+          AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+          AZURE_RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
+        run: |
+          TARGET_URL=""
+
+          # 1. Prioridad: URL ingresada manualmente en workflow_dispatch
+          if [ -n "${INPUT_URL}" ]; then
+            TARGET_URL="${INPUT_URL}"
+            echo "Origen de URL: Parámetro manual workflow_dispatch"
+          # 2. Prioridad: Secreto configurado en el repositorio (MEDSCAN_API_URL / SERVICE_URL)
+          elif [ -n "${SECRET_API_URL}" ]; then
+            TARGET_URL="${SECRET_API_URL}"
+            echo "Origen de URL: Secreto de repositorio (MEDSCAN_API_URL/SERVICE_URL)"
+          # 3. Prioridad: Consulta dinámica a Azure CLI si existen credenciales
+          elif [ -n "${AZURE_CREDENTIALS}" ] && [ -n "${AZURE_RESOURCE_GROUP}" ]; then
+            echo "Consultando FQDN activo en Azure Container Instances..."
+            az login --service-principal \
+              -u "$(echo "${AZURE_CREDENTIALS}" | jq -r .appId)" \
+              -p "$(echo "${AZURE_CREDENTIALS}" | jq -r .password)" \
+              --tenant "$(echo "${AZURE_CREDENTIALS}" | jq -r .tenant)" > /dev/null 2>&1 || true
+
+            LIVE_FQDN=$(az container show \
+              --resource-group "${AZURE_RESOURCE_GROUP}" \
+              --name medscan-backend-aci \
+              --query ipAddress.fqdn -o tsv 2>/dev/null || echo "")
+
+            if [ -n "${LIVE_FQDN}" ]; then
+              TARGET_URL="http://${LIVE_FQDN}:8080"
+              echo "Origen de URL: FQDN dinámico obtenido de Azure ACI"
+            fi
+          fi
+
+          # 4. Fallback por defecto si no se pudo resolver por las vías anteriores
+          if [ -z "${TARGET_URL}" ]; then
+            TARGET_URL="http://medscan-backend-aci.eastus2.azurecontainer.io:8080"
+            echo "Origen de URL: Dominio estándar de contingencia ACI"
+          fi
+
+          # Normalizar eliminando barra final si existe
+          TARGET_URL="${TARGET_URL%/}"
+
+          # Enmascarar la URL para que GitHub Actions la oculte en todos los logs (Clean Security)
+          echo "::add-mask::${TARGET_URL}"
+          echo "target_url=${TARGET_URL}" >> $GITHUB_OUTPUT
+          echo "URL objetivo configurada y protegida con máscara en logs."
+
+      # ------------------------------------------------------------------------
+      # 2. VERIFICACIÓN DE DISPONIBILIDAD Y ESTADO DE SALUD (/actuator/health)
+      # Falla estrictamente si el código HTTP no es 200 o el status no es "UP"
+      # ------------------------------------------------------------------------
+      - name: Ejecutar Health Check (/actuator/health)
+        id: health-check
+        env:
+          TARGET_URL: ${{ steps.resolve-url.outputs.target_url }}
+          TIMEOUT: ${{ github.event.inputs.timeout_seconds || '15' }}
+        run: |
+          HEALTH_ENDPOINT="${TARGET_URL}/actuator/health"
+          echo "Consultando endpoint de salud..."
+
+          # Petición HTTP con curl guardando código de respuesta y cuerpo JSON
+          HTTP_STATUS=$(curl -s -S -o health_response.json -w "%{http_code}" \
+            --connect-timeout 5 \
+            --max-time "${TIMEOUT}" \
+            "${HEALTH_ENDPOINT}" || echo "000")
+
+          echo "Código HTTP recibido: ${HTTP_STATUS}"
+          echo "http_status=${HTTP_STATUS}" >> $GITHUB_OUTPUT
+
+          if [ -f health_response.json ]; then
+            cat health_response.json || true
+            echo ""
+            HEALTH_PAYLOAD=$(cat health_response.json 2>/dev/null || echo "{}")
+          else
+            HEALTH_PAYLOAD="{}"
+          fi
+          echo "payload=${HEALTH_PAYLOAD}" >> $GITHUB_OUTPUT
+
+          # Validación estricta: debe responder HTTP 200
+          if [ "${HTTP_STATUS}" != "200" ]; then
+            echo "::error::El servicio falló el health check. Se esperaba HTTP 200 pero se recibió HTTP ${HTTP_STATUS}."
+            exit 1
+          fi
+
+          # Validación semántica del estado reportado por Spring Boot
+          APP_STATUS=$(echo "${HEALTH_PAYLOAD}" | jq -r '.status // empty' 2>/dev/null || echo "")
+          echo "Estado reportado por la aplicación: ${APP_STATUS}"
+          if [ "${APP_STATUS}" != "UP" ]; then
+            echo "::error::El estado de la aplicación no es 'UP' (Reportado: '${APP_STATUS}')."
+            exit 1
+          fi
+
+          echo "✅ Health check superado exitosamente (HTTP 200 / UP)."
+
+      # ------------------------------------------------------------------------
+      # 3. VERIFICACIÓN DE PROBES Y TELEMETRÍA DE MÉTRICAS (12-FACTOR APP)
+      # ------------------------------------------------------------------------
+      - name: Recolectar métricas y probes (/actuator/metrics y /health/liveness)
+        if: success()
+        env:
+          TARGET_URL: ${{ steps.resolve-url.outputs.target_url }}
+        run: |
+          echo "Recolectando telemetría del servicio activo..."
+          LIVENESS_STATUS=$(curl -s -w "%{http_code}" -o /dev/null "${TARGET_URL}/actuator/health/liveness" || echo "000")
+          READINESS_STATUS=$(curl -s -w "%{http_code}" -o /dev/null "${TARGET_URL}/actuator/health/readiness" || echo "000")
+          UPTIME_JSON=$(curl -s "${TARGET_URL}/actuator/metrics/process.uptime" 2>/dev/null || echo "{}")
+          UPTIME_VAL=$(echo "${UPTIME_JSON}" | jq -r '.measurements[0].value // "N/A"' 2>/dev/null || echo "N/A")
+
+          echo "### 📊 Resumen de Monitoreo de Servicio" >> $GITHUB_STEP_SUMMARY
+          echo "- **Estado del Servicio:** 🟢 **OPERACIONAL (200 OK / UP)**" >> $GITHUB_STEP_SUMMARY
+          echo "- **Liveness Probe:** \`HTTP ${LIVENESS_STATUS}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Readiness Probe:** \`HTTP ${READINESS_STATUS}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tiempo de Actividad (Process Uptime):** \`${UPTIME_VAL} segundos\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Fecha/Hora de Ejecución (UTC):** \`$(date -u '+%Y-%m-%d %H:%M:%S UTC')\`" >> $GITHUB_STEP_SUMMARY
+
+      # ------------------------------------------------------------------------
+      # 4. GESTIÓN DE ALERTAS ANTE FALLO: CREACIÓN O ACTUALIZACIÓN DE ISSUE EN GITHUB
+      # Principio: Notificación automática e idempotente (evita spam de issues repetidas)
+      # ------------------------------------------------------------------------
+      - name: Notificar incidente (Crear o Actualizar GitHub Issue de Alerta)
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HTTP_STATUS: ${{ steps.health-check.outputs.http_status || 'Connection Error / Timeout' }}
+          PAYLOAD: ${{ steps.health-check.outputs.payload || 'No response' }}
+          RUN_URL: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+        run: |
+          ISSUE_TITLE="🚨 [ALERTA] Fallo de Disponibilidad en Servicio Desplegado (MedScan API)"
+          TIMESTAMP="$(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+
+          echo "Buscando si ya existe un incidente activo sin resolver..."
+          EXISTING_ISSUE=$(gh issue list \
+            --repo "${{ github.repository }}" \
+            --state open \
+            --search "${ISSUE_TITLE} in:title" \
+            --json number \
+            --jq '.[0].number // empty' 2>/dev/null || echo "")
+
+          if [ -n "${EXISTING_ISSUE}" ]; then
+            echo "Actualizando issue de incidente existente #${EXISTING_ISSUE}..."
+            COMMENT_BODY=$(cat <<EOF
+          ⚠️ **Actualización de Monitoreo (${TIMESTAMP})**:
+          El servicio continúa sin responder adecuadamente al endpoint de salud \`/actuator/health\`.
+          - **Código HTTP:** \`${HTTP_STATUS}\`
+          - **Detalle de ejecución:** [Ver workflow run](${RUN_URL})
+          EOF
+          )
+            gh issue comment "${EXISTING_ISSUE}" \
+              --repo "${{ github.repository }}" \
+              --body "${COMMENT_BODY}"
+          else
+            echo "Creando nueva issue de incidente de disponibilidad..."
+            ISSUE_BODY=$(cat <<EOF
+          ## 🚨 Incidente de Disponibilidad Detectado
+
+          El workflow automatizado de monitoreo detectó que el servicio desplegado de **MedScan AI Backend** no responde con \`HTTP 200 OK\` en su endpoint de salud.
+
+          ### 📋 Detalles del Incidente
+          - **Fecha y Hora de Detección:** \`${TIMESTAMP}\`
+          - **Endpoint Monitoreado:** \`/actuator/health\`
+          - **Código HTTP Recibido:** \`${HTTP_STATUS}\`
+          - **Respuesta:**
+          \`\`\`json
+          ${PAYLOAD}
+          \`\`\`
+
+          ### 🔗 Enlaces y Diagnóstico
+          - **Ejecución del Workflow:** [Workflow Run #${{ github.run_id }}](${RUN_URL})
+          - **Acciones Recomendadas:**
+            1. Revisar los logs del contenedor en Azure Container Instances (\`az container logs\`).
+            2. Verificar conectividad con la base de datos PostgreSQL.
+            3. Comprobar cuotas o reinicios del contenedor en Azure Portal.
+          EOF
+          )
+            gh issue create \
+              --repo "${{ github.repository }}" \
+              --title "${ISSUE_TITLE}" \
+              --label "Priority: High,Infraestructure" \
+              --body "${ISSUE_BODY}"
+          fi
+
+          echo "### ❌ Alerta de Incidente Registrada" >> $GITHUB_STEP_SUMMARY
+          echo "- **Estado del Servicio:** 🔴 **FALLO DETECTADO**" >> $GITHUB_STEP_SUMMARY
+          echo "- **Código HTTP recibido:** \`${HTTP_STATUS}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Hora del evento:** \`${TIMESTAMP}\`" >> $GITHUB_STEP_SUMMARY
+
+      # ------------------------------------------------------------------------
+      # 5. RESOLUCIÓN AUTOMÁTICA DE INCIDENTES AL RESTABLECERSE EL SERVICIO
+      # Si una issue de caída estaba abierta y el servicio se recuperó, se auto-cierra
+      # ------------------------------------------------------------------------
+      - name: Auto-cerrar alertas previas si el servicio se restableció
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ISSUE_TITLE="🚨 [ALERTA] Fallo de Disponibilidad en Servicio Desplegado (MedScan API)"
+          TIMESTAMP="$(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+
+          EXISTING_ISSUE=$(gh issue list \
+            --repo "${{ github.repository }}" \
+            --state open \
+            --search "${ISSUE_TITLE} in:title" \
+            --json number \
+            --jq '.[0].number // empty' 2>/dev/null || echo "")
+
+          if [ -n "${EXISTING_ISSUE}" ]; then
+            echo "Cerrando issue de incidente #${EXISTING_ISSUE} debido a que el servicio se restableció..."
+            RECOVERY_MSG="✅ **Incidente Resuelto Automáticamente (${TIMESTAMP})**: El servicio ha vuelto a responder exitosamente (\`HTTP 200 OK\` / \`status: UP\`) al chequeo de monitoreo."
+            gh issue close "${EXISTING_ISSUE}" \
+              --repo "${{ github.repository }}" \
+              --comment "${RECOVERY_MSG}"
+          fi
