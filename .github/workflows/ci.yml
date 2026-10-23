@@ -1,4 +1,4 @@
-name: CI/CD Pipeline - MedScan AI Backend
+name: CI Pipeline - MedScan AI Backend
 
 on:
   push:
@@ -7,12 +7,16 @@ on:
     branches: [main]
 
 permissions:
-  contents: write
+  contents: read
   security-events: write
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   # ============================================================================
-  # FASE 1: INTEGRACIÓN CONTINUA (CI) - Build, Pruebas y Seguridad de Código/Dependencias
+  # FASE 1: INTEGRACIÓN CONTINUA (CI) - Build, Pruebas y Seguridad de Dependencias
   # ============================================================================
   build-and-test:
     name: 1. Build, Tests & Snyk (SCA/SAST)
@@ -78,7 +82,7 @@ jobs:
           args: --severity-threshold=high
 
   # ============================================================================
-  # FASE 2: ESCANEO DE IMAGEN DOCKER CON GRYPE (CVEs en capas del contenedor)
+  # FASE 2: ESCANEO DE SEGURIDAD EN CONTENEDOR DOCKER (Grype CVEs)
   # ============================================================================
   container-security-scan:
     name: 2. Docker Build & Grype (Container Vulnerabilities)
@@ -92,8 +96,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # ¿DÓNDE SE CREA LA IMAGEN EN EL CI?:
-      # Se construye aquí mismo, en el runner virtual efímero de GitHub Actions (ubuntu-latest)
+      # Validación de construcción en runner efímero de CI
       - name: Construir imagen Docker de producción (--target production)
         run: |
           docker build --target production -t medscan-backend:scan-target .
@@ -111,205 +114,3 @@ jobs:
           image: "medscan-backend:scan-target"
           fail-build: false
           severity-cutoff: high
-
-  # ============================================================================
-  # FASE 3: VERSIONADO SEMÁNTICO (vX.Y.Z) Y DESPLIEGUE CONTINUO CONDICIONADO A AZURE
-  # ============================================================================
-  # REGLAS DE VERSIONADO Y CONDICIONAMIENTO DE DEPLOY SEGÚN COMMIT:
-  # - feat(scope):     aumenta +1 en Y (vX.Y+1.0) -> SÍ genera versión y SÍ despliega
-  # - fix(scope):      aumenta +1 en Z (vX.Y.Z+1) -> SÍ genera versión y SÍ despliega
-  # - refactor(scope): aumenta +1 en Z (vX.Y.Z+1) -> SÍ genera versión y SÍ despliega
-  # - doc(scope) / docs(scope): no aumenta versión (-) -> NO despliega
-  # - chore(scope):             no aumenta versión (-) -> NO despliega
-  deploy-to-azure:
-    name: 3. Semantic Versioning (vX.Y.Z) & Deploy to Azure ACI
-    runs-on: ubuntu-latest
-    needs: [build-and-test, container-security-scan]
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
-
-    steps:
-      - name: Checkout del código con historial completo de tags
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      # ------------------------------------------------------------------------
-      # CÁLCULO AUTOMÁTICO DE VERSIÓN vX.Y.Z Y CONDICIONAMIENTO DE DEPLOY
-      # ------------------------------------------------------------------------
-      - name: Calcular versión vX.Y.Z según Conventional Commits
-        id: semver
-        run: |
-          git fetch --tags --force
-          LATEST_TAG=$(git tag -l "v[0-9]*.[0-9]*.[0-9]*" --sort=-v:refname | head -n 1)
-          if [ -z "$LATEST_TAG" ]; then
-            LATEST_TAG="v1.0.0"
-            X=1; Y=0; Z=0
-            echo "No existía tag previo. Base inicial: ${LATEST_TAG}"
-          else
-            VERSION_NUM=${LATEST_TAG#v}
-            IFS='.' read -r X Y Z <<< "$VERSION_NUM"
-            echo "Último tag detectado: ${LATEST_TAG} (X=${X}, Y=${Y}, Z=${Z})"
-          fi
-
-          COMMIT_MSG=$(git log -1 --pretty=%s)
-          echo "Mensaje de commit analizado: ${COMMIT_MSG}"
-
-          SHOULD_DEPLOY="false"
-          NEW_VERSION="${LATEST_TAG}"
-
-          if echo "$COMMIT_MSG" | grep -qE "^feat(\([^)]+\))?!:|BREAKING CHANGE"; then
-            X=$((X + 1))
-            Y=0
-            Z=0
-            NEW_VERSION="v${X}.${Y}.${Z}"
-            SHOULD_DEPLOY="true"
-            echo "Breaking change detectado -> Aumenta X: ${NEW_VERSION}"
-          elif echo "$COMMIT_MSG" | grep -qE "^feat(\([^)]+\))?:"; then
-            Y=$((Y + 1))
-            Z=0
-            NEW_VERSION="v${X}.${Y}.${Z}"
-            SHOULD_DEPLOY="true"
-            echo "feat(scope) detectado -> Aumenta 1 en Y: ${NEW_VERSION}"
-          elif echo "$COMMIT_MSG" | grep -qE "^(fix|refactor)(\([^)]+\))?:"; then
-            Z=$((Z + 1))
-            NEW_VERSION="v${X}.${Y}.${Z}"
-            SHOULD_DEPLOY="true"
-            echo "fix/refactor(scope) detectado -> Aumenta 1 en Z: ${NEW_VERSION}"
-          elif echo "$COMMIT_MSG" | grep -qE "^(docs?|chore)(\([^)]+\))?:"; then
-            SHOULD_DEPLOY="false"
-            echo "doc(scope) o chore(scope) detectado -> Sin incremento de versión (-). Se omite deploy."
-          else
-            SHOULD_DEPLOY="false"
-            echo "Commit sin prefijo de despliegue (feat/fix/refactor) -> Sin incremento de versión (-). Se omite deploy."
-          fi
-
-          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
-          echo "version=${NEW_VERSION}" >> $GITHUB_OUTPUT
-          echo "previous_version=${LATEST_TAG}" >> $GITHUB_OUTPUT
-          echo "should_deploy=${SHOULD_DEPLOY}" >> $GITHUB_OUTPUT
-          echo "short_sha=${SHORT_SHA}" >> $GITHUB_OUTPUT
-          echo "tag_name=${NEW_VERSION}" >> $GITHUB_OUTPUT
-
-      - name: Crear y subir Tag Git (vX.Y.Z) al repositorio
-        if: steps.semver.outputs.should_deploy == 'true'
-        run: |
-          NEW_TAG="${{ steps.semver.outputs.version }}"
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag -f "${NEW_TAG}"
-          git push origin "${NEW_TAG}" --force
-          echo "Tag ${NEW_TAG} publicado exitosamente en el repositorio."
-
-      # ------------------------------------------------------------------------
-      # AUTENTICACIÓN Y SUBIDA A AZURE CONTAINER REGISTRY (ACR) CON SERVICE PRINCIPAL
-      # ¿Para qué se usa el Service Principal?:
-      # Identidad de máquina segura (M2M: AZURE_APP_ID + AZURE_PASSWORD) con permisos
-      # RBAC estrictos sobre el ACR/Resource Group, sin exponer cuentas personales.
-      # ------------------------------------------------------------------------
-      - name: Construir y subir imagen de Producción a Azure ACR (upload_to_acr.py)
-        if: steps.semver.outputs.should_deploy == 'true' && (env.AZURE_APP_ID != '' || env.AZURE_CREDENTIALS != '')
-        env:
-          AZURE_APP_ID: ${{ secrets.AZURE_APP_ID || secrets.ACR_USERNAME }}
-          AZURE_PASSWORD: ${{ secrets.AZURE_PASSWORD || secrets.ACR_PASSWORD }}
-          AZURE_ACR_NAME: ${{ secrets.AZURE_ACR_NAME || secrets.ACR_LOGIN_SERVER || 'ingenieriagrupo3.azurecr.io' }}
-          AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
-        run: |
-          IMAGE_TAG="${{ steps.semver.outputs.version }}"
-          python3 upload_to_acr.py \
-            --image-name medscan-backend \
-            --tag "${IMAGE_TAG}" \
-            --target production \
-            --also-tag-latest
-
-      - name: Iniciar sesión en Azure CLI con Service Principal (para despliegue en ACI)
-        uses: azure/login@v2
-        if: steps.semver.outputs.should_deploy == 'true' && env.AZURE_CREDENTIALS != ''
-        env:
-          AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
-
-      - name: Validar registro del proveedor Microsoft.ContainerInstance en Azure
-        if: steps.semver.outputs.should_deploy == 'true' && env.AZURE_CREDENTIALS != ''
-        run: |
-          echo "Verificando registro del proveedor Microsoft.ContainerInstance..."
-          STATE=$(az provider show --namespace Microsoft.ContainerInstance --query registrationState -o tsv 2>/dev/null || echo "NotRegistered")
-          echo "Estado actual: ${STATE}"
-          if [ "${STATE}" != "Registered" ]; then
-            echo "Registrando namespace Microsoft.ContainerInstance..."
-            az provider register --namespace Microsoft.ContainerInstance
-            for i in $(seq 1 30); do
-              STATE=$(az provider show --namespace Microsoft.ContainerInstance --query registrationState -o tsv 2>/dev/null || echo "Registering")
-              echo "Intento $i: Estado es ${STATE}"
-              if [ "${STATE}" = "Registered" ]; then
-                break
-              fi
-              sleep 5
-            done
-          fi
-          if [ "${STATE}" != "Registered" ]; then
-            echo "::warning::El proveedor Microsoft.ContainerInstance aún está en estado '${STATE}'."
-          else
-            echo "Proveedor Microsoft.ContainerInstance verificado exitosamente (Registered)."
-          fi
-
-      # ------------------------------------------------------------------------
-      # DESPLIEGUE CONTINUO EN AZURE CONTAINER INSTANCES (ACI)
-      # ------------------------------------------------------------------------
-      - name: Desplegar / Actualizar instancia en Azure Container Instances (ACI)
-        uses: azure/aci-deploy@v1
-        if: steps.semver.outputs.should_deploy == 'true' && env.AZURE_CREDENTIALS != ''
-        env:
-          AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
-        with:
-          resource-group: ${{ secrets.AZURE_RESOURCE_GROUP }}
-          dns-name-label: medscan-api-${{ steps.semver.outputs.short_sha }}
-          image: ${{ secrets.AZURE_ACR_NAME || secrets.ACR_LOGIN_SERVER || 'ingenieriagrupo3.azurecr.io' }}/medscan-backend:${{ steps.semver.outputs.version }}
-          name: medscan-backend-aci
-          location: 'eastus2'
-          registry-login-server: ${{ secrets.AZURE_ACR_NAME || secrets.ACR_LOGIN_SERVER || 'ingenieriagrupo3.azurecr.io' }}
-          registry-username: ${{ secrets.AZURE_APP_ID || secrets.ACR_USERNAME }}
-          registry-password: ${{ secrets.AZURE_PASSWORD || secrets.ACR_PASSWORD }}
-          ports: 8080
-          cpu: 1
-          memory: 1.5
-          environment-variables: |
-            SPRING_PROFILES_ACTIVE=prod
-            SERVER_PORT=8080
-            SPRING_DATASOURCE_URL=${{ secrets.SPRING_DATASOURCE_URL }}
-            SPRING_DATASOURCE_USERNAME=${{ secrets.SPRING_DATASOURCE_USERNAME }}
-            JWT_SECRET=${{ secrets.JWT_SECRET }}
-            JWT_EXPIRATION_MS=${{ secrets.JWT_EXPIRATION_MS }}
-            SCAN_OPENAI_API_KEY=${{ secrets.SCAN_OPENAI_API_KEY }}
-            SCAN_OPENAI_MODEL=${{ secrets.SCAN_OPENAI_MODEL }}
-            SCAN_OPENAI_URL=${{ secrets.SCAN_OPENAI_URL }}
-            NOTIFICATION_EXPO_URL=${{ secrets.NOTIFICATION_EXPO_URL }}
-            NOTIFICATION_REMINDER_DELAY_MS=${{ secrets.NOTIFICATION_REMINDER_DELAY_MS }}
-            NOTIFICATION_REMINDER_ADVANCE_MINUTES=${{ secrets.NOTIFICATION_REMINDER_ADVANCE_MINUTES }}
-          secure-environment-variables: |
-            SPRING_DATASOURCE_PASSWORD=${{ secrets.SPRING_DATASOURCE_PASSWORD }}
-
-      # ------------------------------------------------------------------------
-      # VERIFICACIÓN DE SALUD Y MÉTRICAS POST-DEPLOY (12 FACTOR APP)
-      # ------------------------------------------------------------------------
-      - name: Validar salud y métricas en vivo (/actuator/health y /actuator/metrics)
-        if: steps.semver.outputs.should_deploy == 'true' && env.AZURE_CREDENTIALS != ''
-        env:
-          AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
-        run: |
-          FQDN="medscan-api-${{ steps.semver.outputs.short_sha }}.eastus2.azurecontainer.io"
-          BASE_URL="http://${FQDN}:8080"
-          echo "=================================================================="
-          echo "URL PARA POSTMAN / WEB: ${BASE_URL}"
-          echo "=================================================================="
-          echo "### 🚀 Despliegue Exitoso en Azure ACI" >> $GITHUB_STEP_SUMMARY
-          echo "- **Versión desplegada:** \`${{ steps.semver.outputs.version }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **URL Base (para Postman):** \`${BASE_URL}\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Health Check:** \`${BASE_URL}/actuator/health\`" >> $GITHUB_STEP_SUMMARY
-          echo "- **Métricas (12-Factor):** \`${BASE_URL}/actuator/metrics\`" >> $GITHUB_STEP_SUMMARY
-
-          echo "1. Verificando estado de salud (/actuator/health)..."
-          curl --retry 6 --retry-delay 10 --fail "${BASE_URL}/actuator/health" || true
-
-          echo "2. Verificando telemetría y métricas (/actuator/metrics/process.uptime)..."
-          curl --retry 3 --retry-delay 5 --fail "${BASE_URL}/actuator/metrics/process.uptime" || true

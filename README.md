@@ -113,14 +113,24 @@ Actuator expone `health`, `info` y `metrics`. Los health probes están habilitad
 
 En `postman/` hay una colección con entornos `Local` y `Azure` para probar la API manualmente.
 
-## ☁️ Despliegue y CI/CD
+## ☁️ Despliegue y CI/CD (Clean Pipelines)
 
-El pipeline `.github/workflows/ci.yml` se ejecuta en `push` a `main`/`develop` y en pull requests hacia `main`:
+La integración y el despliegue continuo se encuentran desacoplados en workflows independientes según el principio de responsabilidad única (Clean Architecture / Separation of Concerns):
 
-1. **Build, tests y Snyk** (SCA/SAST) con `./mvnw -B clean verify` sobre Java 25.
-2. **Docker build y Grype** para detectar vulnerabilidades en la imagen.
-3. **Versionado semántico (`vX.Y.Z`) y despliegue** a Azure Container Instances, con verificación de `/actuator/health`.
-4. El resumen del despliegue en GitHub Actions incluye enlaces directos de Azure Portal a los logs y métricas de ACI y al repositorio de imágenes de ACR.
+1. **Integración Continua (`.github/workflows/ci.yml`)**:
+   - Se ejecuta en `push` a `main`/`develop` y en `pull_request` a `main`.
+   - **Build & Tests**: Compila y ejecuta todos los tests unitarios y de integración con `./mvnw -B clean verify` sobre Java 25 y contenedor PostgreSQL.
+   - **Snyk (SCA & SAST)**: Analiza vulnerabilidades en dependencias Maven.
+   - **Grype**: Escanea vulnerabilidades en capas base de contenedores Docker (`anchore/scan-action`).
+   - *Nota de seguridad*: No posee acceso a credenciales de despliegue ni a infraestructura de Azure.
+
+2. **Despliegue Continuo (`.github/workflows/cd.yml`)**:
+   - Se dispara únicamente tras la finalización exitosa del CI (`workflow_run` sobre `CI Pipeline - MedScan AI Backend`). Un fallo en CI bloquea por completo el CD.
+   - **Versionado Semántico (`vX.Y.Z`)**: Calcula la versión según Conventional Commits (`feat` -> Y, `fix`/`refactor` -> Z, `doc`/`chore` -> omitir).
+   - **Publicación en ACR**: Construye y sube la imagen de producción al Azure Container Registry mediante Service Principal (`upload_to_acr.py`).
+   - **Aprovisionamiento en ACI**: Despliega o actualiza la instancia en Azure Container Instances validando pre-registro de `Microsoft.ContainerInstance`.
+   - **Smoke Tests & 12-Factor App**: Valida telemetría, métricas y estado de salud en vivo (`/actuator/health` y `/actuator/metrics`).
+   - *Nota de seguridad*: Todos los secretos de infraestructura residen exclusivamente en este workflow y se leen desde GitHub Secrets.
 
 Para subir la imagen a Azure Container Registry manualmente usa `upload_to_acr.py` (lee las variables de `.env`). Los comandos de referencia de Azure CLI están en [`docs/azure_comands.md`](docs/azure_comands.md).
 
