@@ -44,7 +44,7 @@ class AdminControllerTest {
         adminUser.setEmail("admin_user@test.com");
         adminUser.setPassword("hashed");
         adminUser.setName("Admin Tester");
-        adminUser.setRole(Role.ADMIN);
+        adminUser.setRole(Role.SYSTEM);
         adminUser = userRepo.save(adminUser);
 
         regularUser = new User();

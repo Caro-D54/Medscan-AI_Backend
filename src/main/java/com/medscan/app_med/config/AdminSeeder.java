@@ -37,8 +37,8 @@ public class AdminSeeder implements CommandLineRunner {
         userRepo.findByEmail(adminEmail).ifPresentOrElse(
                 user -> {
                     boolean updated = false;
-                    if (user.getRole() != Role.ADMIN) {
-                        user.setRole(Role.ADMIN);
+                    if (user.getRole() != Role.SYSTEM) {
+                        user.setRole(Role.SYSTEM);
                         updated = true;
                     }
                     if (!passwordEncoder.matches(adminPassword, user.getPassword())) {
@@ -47,7 +47,7 @@ public class AdminSeeder implements CommandLineRunner {
                     }
                     if (updated) {
                         userRepo.save(user);
-                        log.info("Usuario existente actualizado a rol ADMIN con credenciales configuradas: {}", adminEmail);
+                        log.info("Usuario existente actualizado a rol SYSTEM con credenciales configuradas: {}", adminEmail);
                     }
                 },
                 () -> {
@@ -55,7 +55,7 @@ public class AdminSeeder implements CommandLineRunner {
                     admin.setEmail(adminEmail);
                     admin.setName(adminName);
                     admin.setPassword(passwordEncoder.encode(adminPassword));
-                    admin.setRole(Role.ADMIN);
+                    admin.setRole(Role.SYSTEM);
                     userRepo.save(admin);
                     log.info("Usuario Administrador inicial creado exitosamente: {}", adminEmail);
                 }

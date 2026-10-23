@@ -76,7 +76,7 @@ class AdminServiceTest {
         user.setId(3L);
         user.setName("Admin User");
         user.setEmail("admin@test.com");
-        user.setRole(Role.ADMIN);
+        user.setRole(Role.SYSTEM);
 
         PageRequest pageRequest = PageRequest.of(0, 10);
         when(userRepo.findByNameContainingIgnoreCaseOrEmailContainingIgnoreCase("admin", "admin", pageRequest))
@@ -132,7 +132,7 @@ class AdminServiceTest {
     @Test
     void getMetricsCalculatesExpectedCounts() {
         when(userRepo.count()).thenReturn(10L);
-        when(userRepo.countByRole(Role.ADMIN)).thenReturn(2L);
+        when(userRepo.countByRole(Role.SYSTEM)).thenReturn(2L);
         when(userRepo.countByRole(Role.USER)).thenReturn(8L);
         when(userRepo.countByCreatedAtAfter(any(LocalDateTime.class))).thenReturn(3L);
         when(medicamentRepo.count()).thenReturn(25L);

@@ -65,14 +65,14 @@ class AuthServiceTest {
     }
 
     @Test
-    void registerWithExplicitAdminRoleSetsAdminRole() {
-        RegisterRequest request = new RegisterRequest("admin@medscan.com", "secret123", "Admin User", Role.ADMIN);
+    void registerAlwaysAssignsUserRole() {
+        RegisterRequest request = new RegisterRequest("admin@medscan.com", "secret123", "Admin User");
         User saved = new User();
         saved.setId(2L);
         saved.setEmail("admin@medscan.com");
         saved.setPassword("hashed");
         saved.setName("Admin User");
-        saved.setRole(Role.ADMIN);
+        saved.setRole(Role.USER);
 
         when(userRepo.existsByEmail("admin@medscan.com")).thenReturn(false);
         when(passwordEncoder.encode("secret123")).thenReturn("hashed");
@@ -82,11 +82,11 @@ class AuthServiceTest {
         AuthResponse response = authService.register(request);
 
         assertThat(response.getToken()).isEqualTo("jwt-admin-token");
-        assertThat(response.getUser().role()).isEqualTo(Role.ADMIN);
+        assertThat(response.getUser().role()).isEqualTo(Role.USER);
 
         ArgumentCaptor<User> captor = ArgumentCaptor.forClass(User.class);
         verify(userRepo).save(captor.capture());
-        assertThat(captor.getValue().getRole()).isEqualTo(Role.ADMIN);
+        assertThat(captor.getValue().getRole()).isEqualTo(Role.USER);
     }
 
     @Test

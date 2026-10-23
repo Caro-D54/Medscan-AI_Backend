@@ -14,7 +14,7 @@ class UserDtoTest {
         user.setId(42L);
         user.setName("Carolina");
         user.setEmail("caro@medscan.com");
-        user.setRole(Role.ADMIN);
+        user.setRole(Role.SYSTEM);
 
         UserDto dto = UserDto.fromEntity(user);
 
@@ -22,7 +22,7 @@ class UserDtoTest {
         assertThat(dto.id()).isEqualTo(42L);
         assertThat(dto.name()).isEqualTo("Carolina");
         assertThat(dto.email()).isEqualTo("caro@medscan.com");
-        assertThat(dto.role()).isEqualTo(Role.ADMIN);
+        assertThat(dto.role()).isEqualTo(Role.SYSTEM);
     }
 
     @Test

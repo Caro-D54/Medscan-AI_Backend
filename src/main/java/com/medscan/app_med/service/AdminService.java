@@ -67,7 +67,7 @@ public class AdminService {
     @Transactional(readOnly = true)
     public AdminMetricsDto getMetrics() {
         long totalUsers = userRepo.count();
-        long adminUsers = userRepo.countByRole(Role.ADMIN);
+        long adminUsers = userRepo.countByRole(Role.SYSTEM);
         long regularUsers = userRepo.countByRole(Role.USER);
 
         LocalDateTime sevenDaysAgo = LocalDateTime.now().minusDays(7);

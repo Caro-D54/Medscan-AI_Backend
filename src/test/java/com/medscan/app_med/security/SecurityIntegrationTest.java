@@ -132,14 +132,14 @@ class SecurityIntegrationTest {
     }
 
     @Test
-    void registerAdminReturnsRoleAdmin() throws Exception {
+    void registerIgnoresRequestedRoleAndAssignsUser() throws Exception {
         mockMvc.perform(post("/api/v1/auth/register")
                         .contentType("application/json")
                         .content("""
-                                {"email":"adminuser@medscan.com","password":"secretPass123","name":"Admin User","role":"ADMIN"}"""))
+                                {"email":"adminuser@medscan.com","password":"secretPass123","name":"Admin User","role":"SYSTEM"}"""))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.token").isString())
-                .andExpect(jsonPath("$.user.role").value("ADMIN"));
+                .andExpect(jsonPath("$.user.role").value("USER"));
     }
 
     @Test
@@ -335,14 +335,15 @@ class SecurityIntegrationTest {
     }
 
     @Test
-    void metricsEndpointIsPublicAndReturnsTelemetry() throws Exception {
+    void metricsEndpointRequiresAuthentication() throws Exception {
         mockMvc.perform(get("/actuator/metrics"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.names").isArray());
+                .andExpect(status().isUnauthorized());
+    }
 
-        mockMvc.perform(get("/actuator/metrics/jvm.memory.used"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.name").value("jvm.memory.used"))
-                .andExpect(jsonPath("$.measurements").isArray());
+    @Test
+    void swaggerAndActuatorInfoRequireAuthentication() throws Exception {
+        mockMvc.perform(get("/swagger-ui/index.html")).andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/v3/api-docs")).andExpect(status().isUnauthorized());
+        mockMvc.perform(get("/actuator/info")).andExpect(status().isUnauthorized());
     }
 }

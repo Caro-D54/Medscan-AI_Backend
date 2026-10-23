@@ -57,11 +57,11 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
-    void authenticatesWhenBearerTokenIsValidAndAssignsAdminRole() throws Exception {
+    void authenticatesWhenBearerTokenIsValidAndAssignsSystemRole() throws Exception {
         User user = new User();
         user.setId(2L);
         user.setEmail("admin@medscan.com");
-        user.setRole(Role.ADMIN);
+        user.setRole(Role.SYSTEM);
 
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.addHeader("Authorization", "Bearer admin-token");
@@ -76,7 +76,7 @@ class JwtAuthenticationFilterTest {
         assertThat(auth).isNotNull();
         assertThat(auth.getPrincipal()).isEqualTo(user);
         assertThat(auth.getAuthorities()).extracting(GrantedAuthority::getAuthority)
-                .containsExactly("ROLE_ADMIN");
+                .containsExactly("ROLE_SYSTEM");
         verify(filterChain).doFilter(request, response);
     }
 

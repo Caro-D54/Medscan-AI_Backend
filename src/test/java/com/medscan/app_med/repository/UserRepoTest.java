@@ -54,12 +54,12 @@ class UserRepoTest {
         user.setEmail("admin@medscan.com");
         user.setPassword("hashed");
         user.setName("Admin User");
-        user.setRole(com.medscan.app_med.model.Role.ADMIN);
+        user.setRole(com.medscan.app_med.model.Role.SYSTEM);
         User saved = userRepo.save(user);
 
         Optional<User> found = userRepo.findByEmail("admin@medscan.com");
 
         assertThat(found).isPresent();
-        assertThat(found.get().getRole()).isEqualTo(com.medscan.app_med.model.Role.ADMIN);
+        assertThat(found.get().getRole()).isEqualTo(com.medscan.app_med.model.Role.SYSTEM);
     }
 }
