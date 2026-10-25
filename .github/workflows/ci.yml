@@ -11,7 +11,7 @@ on:
       - 'src/main/resources/**'
       - 'src/test/resources/**'
       - 'Dockerfile'
-      - '.github/workflows/ci.yml'
+      - '.github/workflows/**'
   pull_request:
     branches: [main]
     paths:
@@ -20,7 +20,7 @@ on:
       - 'src/main/resources/**'
       - 'src/test/resources/**'
       - 'Dockerfile'
-      - '.github/workflows/ci.yml'
+      - '.github/workflows/**'
 
 permissions:
   contents: read

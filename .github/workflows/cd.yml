@@ -165,13 +165,51 @@ jobs:
             --target production \
             --also-tag-latest
 
+      # ------------------------------------------------------------------------
+      # NORMALIZACIÓN DEFENSIVA DE CREDENCIALES AZURE (Clean DevOps / Single Source of Truth)
+      # Soporta tanto formato SDK-Auth (clientId/clientSecret) como CLI estándar (appId/password)
+      # ------------------------------------------------------------------------
+      - name: Normalizar credenciales de Service Principal para Azure
+        id: azure-creds
+        if: steps.semver.outputs.should_deploy == 'true' && (secrets.AZURE_CREDENTIALS != '' || secrets.AZURE_APP_ID != '')
+        env:
+          RAW_CREDS: ${{ secrets.AZURE_CREDENTIALS }}
+          APP_ID: ${{ secrets.AZURE_APP_ID || secrets.ACR_USERNAME }}
+          PASSWORD: ${{ secrets.AZURE_PASSWORD || secrets.ACR_PASSWORD }}
+          TENANT_ID: ${{ secrets.AZURE_TENANT_ID || 'b1eea3ae-be33-4355-a382-19c8ce58ee71' }}
+          SUB_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID || 'ea92660f-9a3d-4fb7-b490-7505c0113c56' }}
+        run: |
+          CID=""
+          SEC=""
+          TID="${TENANT_ID}"
+          SID="${SUB_ID}"
+
+          if [ -n "${RAW_CREDS}" ]; then
+            CID=$(echo "${RAW_CREDS}" | jq -r '.clientId // .appId // empty' 2>/dev/null || echo "")
+            SEC=$(echo "${RAW_CREDS}" | jq -r '.clientSecret // .password // empty' 2>/dev/null || echo "")
+            TID=$(echo "${RAW_CREDS}" | jq -r '.tenantId // .tenant // empty' 2>/dev/null || echo "${TID}")
+            SID=$(echo "${RAW_CREDS}" | jq -r '.subscriptionId // empty' 2>/dev/null || echo "${SID}")
+          fi
+
+          if [ -z "${CID}" ]; then CID="${APP_ID}"; fi
+          if [ -z "${SEC}" ]; then SEC="${PASSWORD}"; fi
+
+          NORMALIZED=$(jq -n -c \
+            --arg cid "$CID" \
+            --arg sec "$SEC" \
+            --arg sub "$SID" \
+            --arg tid "$TID" \
+            '{clientId: $cid, clientSecret: $sec, subscriptionId: $sub, tenantId: $tid}')
+
+          echo "::add-mask::${SEC}"
+          echo "creds=${NORMALIZED}" >> $GITHUB_OUTPUT
+          echo "Credenciales de Azure normalizadas y enmascaradas exitosamente."
+
       - name: Iniciar sesión en Azure CLI con Service Principal (para despliegue en ACI)
         uses: azure/login@v2
-        if: steps.semver.outputs.should_deploy == 'true' && env.AZURE_CREDENTIALS != ''
-        env:
-          AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+        if: steps.semver.outputs.should_deploy == 'true' && steps.azure-creds.outputs.creds != ''
         with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+          creds: ${{ steps.azure-creds.outputs.creds }}
 
       - name: Validar registro del proveedor Microsoft.ContainerInstance en Azure
         if: steps.semver.outputs.should_deploy == 'true' && env.AZURE_CREDENTIALS != ''
@@ -206,8 +244,8 @@ jobs:
         env:
           AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
         with:
-          resource-group: ${{ secrets.AZURE_RESOURCE_GROUP }}
-          dns-name-label: medscan-api-${{ steps.semver.outputs.short_sha }}
+          resource-group: ${{ secrets.AZURE_RESOURCE_GROUP || 'universidad' }}
+          dns-name-label: ${{ secrets.ACI_DNS_LABEL || 'medscan-api' }}
           image: ${{ secrets.AZURE_ACR_NAME || secrets.ACR_LOGIN_SERVER || 'ingenieriagrupo3.azurecr.io' }}/medscan-backend:${{ steps.semver.outputs.version }}
           name: medscan-backend-aci
           location: 'eastus2'
@@ -241,7 +279,8 @@ jobs:
         env:
           AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
         run: |
-          FQDN="medscan-api-${{ steps.semver.outputs.short_sha }}.eastus2.azurecontainer.io"
+          DNS_LABEL="${{ secrets.ACI_DNS_LABEL || 'medscan-api' }}"
+          FQDN="${DNS_LABEL}.eastus2.azurecontainer.io"
           BASE_URL="http://${FQDN}:8080"
           echo "=================================================================="
           echo "URL PARA POSTMAN / WEB: ${BASE_URL}"

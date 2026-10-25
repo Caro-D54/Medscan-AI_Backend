@@ -55,28 +55,36 @@ jobs:
             TARGET_URL="${SECRET_API_URL}"
             echo "Origen de URL: Secreto de repositorio (MEDSCAN_API_URL/SERVICE_URL)"
           # 3. Prioridad: Consulta dinámica a Azure CLI si existen credenciales
-          elif [ -n "${AZURE_CREDENTIALS}" ] && [ -n "${AZURE_RESOURCE_GROUP}" ]; then
+          elif [ -n "${AZURE_CREDENTIALS}" ]; then
             echo "Consultando FQDN activo en Azure Container Instances..."
-            az login --service-principal \
-              -u "$(echo "${AZURE_CREDENTIALS}" | jq -r .appId)" \
-              -p "$(echo "${AZURE_CREDENTIALS}" | jq -r .password)" \
-              --tenant "$(echo "${AZURE_CREDENTIALS}" | jq -r .tenant)" > /dev/null 2>&1 || true
+            CLIENT_ID=$(echo "${AZURE_CREDENTIALS}" | jq -r '.clientId // .appId // empty' 2>/dev/null || echo "")
+            CLIENT_SECRET=$(echo "${AZURE_CREDENTIALS}" | jq -r '.clientSecret // .password // empty' 2>/dev/null || echo "")
+            TENANT_ID=$(echo "${AZURE_CREDENTIALS}" | jq -r '.tenantId // .tenant // empty' 2>/dev/null || echo "b1eea3ae-be33-4355-a382-19c8ce58ee71")
+            RG="${AZURE_RESOURCE_GROUP:-universidad}"
 
-            LIVE_FQDN=$(az container show \
-              --resource-group "${AZURE_RESOURCE_GROUP}" \
-              --name medscan-backend-aci \
-              --query ipAddress.fqdn -o tsv 2>/dev/null || echo "")
+            if [ -n "${CLIENT_ID}" ] && [ -n "${CLIENT_SECRET}" ]; then
+              az login --service-principal \
+                -u "${CLIENT_ID}" \
+                -p "${CLIENT_SECRET}" \
+                --tenant "${TENANT_ID}" > /dev/null 2>&1 || true
 
-            if [ -n "${LIVE_FQDN}" ]; then
-              TARGET_URL="http://${LIVE_FQDN}:8080"
-              echo "Origen de URL: FQDN dinámico obtenido de Azure ACI"
+              LIVE_FQDN=$(az container show \
+                --resource-group "${RG}" \
+                --name medscan-backend-aci \
+                --query ipAddress.fqdn -o tsv 2>/dev/null || echo "")
+
+              if [ -n "${LIVE_FQDN}" ]; then
+                TARGET_URL="http://${LIVE_FQDN}:8080"
+                echo "Origen de URL: FQDN dinámico obtenido de Azure ACI (${LIVE_FQDN})"
+              fi
             fi
           fi
 
           # 4. Fallback por defecto si no se pudo resolver por las vías anteriores
           if [ -z "${TARGET_URL}" ]; then
-            TARGET_URL="http://medscan-backend-aci.eastus2.azurecontainer.io:8080"
-            echo "Origen de URL: Dominio estándar de contingencia ACI"
+            DEFAULT_DNS="${{ secrets.ACI_DNS_LABEL || 'medscan-api' }}"
+            TARGET_URL="http://${DEFAULT_DNS}.eastus2.azurecontainer.io:8080"
+            echo "Origen de URL: Dominio estándar de contingencia ACI (${DEFAULT_DNS})"
           fi
 
           # Normalizar eliminando barra final si existe
@@ -109,12 +117,12 @@ jobs:
           echo "Código HTTP recibido: ${HTTP_STATUS}"
           echo "http_status=${HTTP_STATUS}" >> $GITHUB_OUTPUT
 
-          if [ -f health_response.json ]; then
+          if [ -f health_response.json ] && [ -s health_response.json ]; then
             cat health_response.json || true
             echo ""
             HEALTH_PAYLOAD=$(cat health_response.json 2>/dev/null || echo "{}")
           else
-            HEALTH_PAYLOAD="{}"
+            HEALTH_PAYLOAD='{"error": "No se recibió respuesta HTTP del servicio (Timeout, DNS no resuelto o Connection Refused)"}'
           fi
           echo "payload=${HEALTH_PAYLOAD}" >> $GITHUB_OUTPUT
 

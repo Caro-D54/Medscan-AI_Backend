@@ -1,4 +1,5 @@
 import argparse
+import json
 import os
 import re
 import subprocess
@@ -39,6 +40,18 @@ load_dotenv_file()
 AZURE_APP_ID = os.getenv("AZURE_APP_ID")
 AZURE_PASSWORD = os.getenv("AZURE_PASSWORD")
 AZURE_ACR_NAME = os.getenv("AZURE_ACR_NAME")
+
+# Normalizacion defensiva desde AZURE_CREDENTIALS si no existen variables individuales
+AZURE_CREDENTIALS = os.getenv("AZURE_CREDENTIALS")
+if AZURE_CREDENTIALS and (not AZURE_APP_ID or not AZURE_PASSWORD):
+    try:
+        creds_data = json.loads(AZURE_CREDENTIALS)
+        AZURE_APP_ID = AZURE_APP_ID or creds_data.get("clientId") or creds_data.get("appId")
+        AZURE_PASSWORD = AZURE_PASSWORD or creds_data.get("clientSecret") or creds_data.get("password")
+        if not AZURE_ACR_NAME and creds_data.get("acrName"):
+            AZURE_ACR_NAME = creds_data.get("acrName")
+    except Exception:
+        pass
 
 
 # ============================================================
