@@ -38,6 +38,20 @@ public class AdminService {
 
     @Transactional(readOnly = true)
     public Page<UserDto> getUsers(String query, Pageable pageable) {
+        return getUsers(query, null, pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<UserDto> getUsers(String query, Boolean loggedIn, Pageable pageable) {
+        if (Boolean.TRUE.equals(loggedIn)) {
+            if (query != null && !query.trim().isEmpty()) {
+                String sanitized = query.trim();
+                return userRepo.findByIsLoggedInTrueAndSearch(sanitized, pageable)
+                        .map(UserDto::fromEntity);
+            }
+            return userRepo.findByIsLoggedInTrue(pageable).map(UserDto::fromEntity);
+        }
+
         if (query != null && !query.trim().isEmpty()) {
             String sanitized = query.trim();
             return userRepo.findByNameContainingIgnoreCaseOrEmailContainingIgnoreCase(sanitized, sanitized, pageable)
@@ -69,6 +83,12 @@ public class AdminService {
         long totalUsers = userRepo.count();
         long adminUsers = userRepo.countByRole(Role.SYSTEM);
         long regularUsers = userRepo.countByRole(Role.USER);
+        long loggedInUsers = 0;
+        try {
+            loggedInUsers = userRepo.countByIsLoggedInTrue();
+        } catch (Exception ignored) {
+            // Fallback en caso de migración en curso
+        }
 
         LocalDateTime sevenDaysAgo = LocalDateTime.now().minusDays(7);
         long newUsersLast7Days = userRepo.countByCreatedAtAfter(sevenDaysAgo);
@@ -86,6 +106,7 @@ public class AdminService {
                 totalUsers,
                 regularUsers,
                 adminUsers,
+                loggedInUsers,
                 newUsersLast7Days,
                 newUsersLast30Days,
                 totalMedications,

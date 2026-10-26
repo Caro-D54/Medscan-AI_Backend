@@ -7,6 +7,8 @@ import com.medscan.app_med.security.JwtService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
+
 @Service
 public class AuthService {
 
@@ -30,6 +32,8 @@ public class AuthService {
         user.setPassword(passwordEncoder.encode(request.password()));
         user.setName(request.name());
         user.setRole(Role.USER);
+        user.setLastLoginAt(LocalDateTime.now());
+        user.setIsLoggedIn(true);
         User saved = userRepo.save(user);
 
         return new AuthResponse(jwtService.generateToken(saved), UserDto.fromEntity(saved));
@@ -43,6 +47,10 @@ public class AuthService {
             throw new InvalidCredentialsException();
         }
 
-        return new AuthResponse(jwtService.generateToken(user), UserDto.fromEntity(user));
+        user.setLastLoginAt(LocalDateTime.now());
+        user.setIsLoggedIn(true);
+        User saved = userRepo.save(user);
+
+        return new AuthResponse(jwtService.generateToken(saved), UserDto.fromEntity(saved));
     }
 }

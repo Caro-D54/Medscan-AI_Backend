@@ -60,10 +60,10 @@ class AdminServiceTest {
         user2.setName("User Two");
         user2.setEmail("two@medscan.com");
 
-        PageRequest pageRequest = PageRequest.of(0, 10);
-        when(userRepo.findAll(pageRequest)).thenReturn(new PageImpl<>(List.of(user1, user2)));
+        Page<User> mockPage = new PageImpl<>(List.of(user1, user2), PageRequest.of(0, 10), 2);
+        when(userRepo.findAll(any(PageRequest.class))).thenReturn(mockPage);
 
-        Page<UserDto> result = adminService.getUsers(null, pageRequest);
+        Page<UserDto> result = adminService.getUsers(null, PageRequest.of(0, 10));
 
         assertThat(result.getContent()).hasSize(2);
         assertThat(result.getContent().get(0).name()).isEqualTo("User One");
@@ -71,30 +71,65 @@ class AdminServiceTest {
     }
 
     @Test
-    void getUsersWithQuerySearchesByNameOrEmail() {
-        User user = new User();
-        user.setId(3L);
-        user.setName("Admin User");
-        user.setEmail("admin@test.com");
-        user.setRole(Role.SYSTEM);
+    void getUsersWithQueryPerformsCaseInsensitiveSearch() {
+        User user1 = new User();
+        user1.setId(1L);
+        user1.setName("Carolina Medic");
+        user1.setEmail("caro@medscan.com");
 
-        PageRequest pageRequest = PageRequest.of(0, 10);
-        when(userRepo.findByNameContainingIgnoreCaseOrEmailContainingIgnoreCase("admin", "admin", pageRequest))
-                .thenReturn(new PageImpl<>(List.of(user)));
+        Page<User> mockPage = new PageImpl<>(List.of(user1), PageRequest.of(0, 10), 1);
+        when(userRepo.findByNameContainingIgnoreCaseOrEmailContainingIgnoreCase(eq("caro"), eq("caro"), any(PageRequest.class)))
+                .thenReturn(mockPage);
 
-        Page<UserDto> result = adminService.getUsers("admin", pageRequest);
+        Page<UserDto> result = adminService.getUsers("caro", PageRequest.of(0, 10));
 
         assertThat(result.getContent()).hasSize(1);
-        assertThat(result.getContent().get(0).email()).isEqualTo("admin@test.com");
+        assertThat(result.getContent().get(0).name()).isEqualTo("Carolina Medic");
     }
 
     @Test
-    void deleteUserPreventsAdminFromDeletingSelf() {
-        User currentAdmin = new User();
-        currentAdmin.setId(99L);
-        currentAdmin.setEmail("admin@test.com");
+    void getUsersWithLoggedInTrueFiltersOnlyActiveUsers() {
+        User user1 = new User();
+        user1.setId(1L);
+        user1.setName("Active User");
+        user1.setEmail("active@medscan.com");
+        user1.setIsLoggedIn(true);
 
-        assertThatThrownBy(() -> adminService.deleteUser(99L, currentAdmin))
+        Page<User> mockPage = new PageImpl<>(List.of(user1), PageRequest.of(0, 10), 1);
+        when(userRepo.findByIsLoggedInTrue(any(PageRequest.class)))
+                .thenReturn(mockPage);
+
+        Page<UserDto> result = adminService.getUsers(null, true, PageRequest.of(0, 10));
+
+        assertThat(result.getContent()).hasSize(1);
+        assertThat(result.getContent().get(0).isLoggedIn()).isTrue();
+    }
+
+    @Test
+    void getUsersWithLoggedInTrueAndSearchFiltersCorrectly() {
+        User user1 = new User();
+        user1.setId(1L);
+        user1.setName("Carolina Active");
+        user1.setEmail("caro@medscan.com");
+        user1.setIsLoggedIn(true);
+
+        Page<User> mockPage = new PageImpl<>(List.of(user1), PageRequest.of(0, 10), 1);
+        when(userRepo.findByIsLoggedInTrueAndSearch(eq("caro"), any(PageRequest.class)))
+                .thenReturn(mockPage);
+
+        Page<UserDto> result = adminService.getUsers("caro", true, PageRequest.of(0, 10));
+
+        assertThat(result.getContent()).hasSize(1);
+        assertThat(result.getContent().get(0).name()).isEqualTo("Carolina Active");
+    }
+
+    @Test
+    void deleteUserFailsWhenDeletingSelf() {
+        User currentAdmin = new User();
+        currentAdmin.setId(1L);
+        currentAdmin.setEmail("admin@medscan.com");
+
+        assertThatThrownBy(() -> adminService.deleteUser(1L, currentAdmin))
                 .isInstanceOf(ResponseStatusException.class)
                 .hasMessageContaining("No puedes eliminar tu propia cuenta");
 
@@ -102,7 +137,7 @@ class AdminServiceTest {
     }
 
     @Test
-    void deleteUserDeletesTargetUserWhenDifferent() {
+    void deleteUserSucceedsForDifferentUser() {
         User currentAdmin = new User();
         currentAdmin.setId(1L);
 
@@ -134,6 +169,7 @@ class AdminServiceTest {
         when(userRepo.count()).thenReturn(10L);
         when(userRepo.countByRole(Role.SYSTEM)).thenReturn(2L);
         when(userRepo.countByRole(Role.USER)).thenReturn(8L);
+        when(userRepo.countByIsLoggedInTrue()).thenReturn(3L);
         when(userRepo.countByCreatedAtAfter(any(LocalDateTime.class))).thenReturn(3L);
         when(medicamentRepo.count()).thenReturn(25L);
         when(treatmentRepo.count()).thenReturn(15L);
@@ -144,6 +180,7 @@ class AdminServiceTest {
         assertThat(metrics.totalUsers()).isEqualTo(10L);
         assertThat(metrics.adminUsers()).isEqualTo(2L);
         assertThat(metrics.regularUsers()).isEqualTo(8L);
+        assertThat(metrics.loggedInUsers()).isEqualTo(3L);
         assertThat(metrics.totalMedications()).isEqualTo(25L);
         assertThat(metrics.totalTreatments()).isEqualTo(15L);
         assertThat(metrics.totalDoses()).isEqualTo(60L);

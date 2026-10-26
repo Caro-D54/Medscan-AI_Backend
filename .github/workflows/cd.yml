@@ -268,8 +268,10 @@ jobs:
             NOTIFICATION_EXPO_URL=${{ secrets.NOTIFICATION_EXPO_URL }}
             NOTIFICATION_REMINDER_DELAY_MS=${{ secrets.NOTIFICATION_REMINDER_DELAY_MS }}
             NOTIFICATION_REMINDER_ADVANCE_MINUTES=${{ secrets.NOTIFICATION_REMINDER_ADVANCE_MINUTES }}
+            APPLICATIONINSIGHTS_ROLE_NAME=medscan-backend-api
           secure-environment-variables: |
             SPRING_DATASOURCE_PASSWORD=${{ secrets.SPRING_DATASOURCE_PASSWORD }}
+            APPLICATIONINSIGHTS_CONNECTION_STRING=${{ secrets.APPLICATIONINSIGHTS_CONNECTION_STRING }}
 
       # ------------------------------------------------------------------------
       # VERIFICACIÓN DE SALUD Y MÉTRICAS POST-DEPLOY (12 FACTOR APP)

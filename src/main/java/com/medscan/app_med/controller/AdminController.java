@@ -27,10 +27,11 @@ public class AdminController {
     public ResponseEntity<Page<UserDto>> listUsers(
             @RequestParam(required = false) String query,
             @RequestParam(required = false) String search,
+            @RequestParam(required = false) Boolean loggedIn,
             @PageableDefault(size = 20, sort = "id") Pageable pageable) {
 
         String searchTerm = query != null ? query : search;
-        return ResponseEntity.ok(adminService.getUsers(searchTerm, pageable));
+        return ResponseEntity.ok(adminService.getUsers(searchTerm, loggedIn, pageable));
     }
 
     @DeleteMapping("/users/{id}")

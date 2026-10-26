@@ -1,6 +1,6 @@
 services:
   # ============================================================================
-  # Servicio de Base de Datos PostgreSQL 18
+  # Servicio de Base de Datos PostgreSQL
   # ============================================================================
   postgres:
     image: postgres:18
@@ -8,8 +8,8 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-medscan_db}
-      POSTGRES_USER: ${SPRING_DATASOURCE_USERNAME:-postgres}
-      POSTGRES_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:-change_me}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-12345_Caro}
       PGDATA: /var/lib/postgresql/data/pgdata
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
@@ -18,11 +18,11 @@ services:
     networks:
       - medscan-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${SPRING_DATASOURCE_USERNAME:-postgres} -d ${POSTGRES_DB:-medscan_db}"]
-      interval: 10s
-      timeout: 5s
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-medscan_db}"]
+      interval: 5s
+      timeout: 3s
       retries: 5
-      start_period: 10s
+      start_period: 5s
 
   # ============================================================================
   # Servicio de Backend (Spring Boot 3 REST API en Java 25)
@@ -39,20 +39,20 @@ services:
         condition: service_healthy
         restart: true
     ports:
-      - "${SERVER_PORT:-8080}:8080"
       - "8088:8080"
+      - "8080:8080"
     environment:
-      # Perfil de ejecución de Spring Boot (prod por defecto en Docker, dev para desarrollo local)
-      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+      # Perfil de ejecución de Spring Boot (dev o prod)
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
 
       # Conexión JDBC interna (apuntando al hostname 'postgres' de la red interna de Docker)
       SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL:-jdbc:postgresql://postgres:5432/medscan_db}
       SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME:-postgres}
-      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:-change_me}
+      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD:-12345_Caro}
       SERVER_PORT: 8080
 
       # Seguridad y Tokens JWT
-      JWT_SECRET: ${JWT_SECRET:-change_me_jwt_secret_at_least_32_chars_prod_value}
+      JWT_SECRET: ${JWT_SECRET:-medscan_ai_super_secret_jwt_key_at_least_32_chars_long}
       JWT_EXPIRATION_MS: ${JWT_EXPIRATION_MS:-86400000}
 
       # Integración con IA (OpenAI Vision / Chat)
@@ -72,10 +72,10 @@ services:
       - medscan-network
     healthcheck:
       test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8080/actuator/health || exit 1"]
-      interval: 15s
+      interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 30s
+      start_period: 25s
 
 # ==============================================================================
 # Volúmenes Persistentes

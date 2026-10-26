@@ -44,24 +44,29 @@ EXPOSE 8080 5005
 CMD ["./mvnw", "spring-boot:run"]
 
 # ------------------------------------------------------------------------------
-# 3. PRODUCTION STAGE (Default): Imagen para Producción ultra liviana con JRE 25 (Alpine)
+# 3. PRODUCTION STAGE (Default): Imagen para Producción con JRE 25 (Alpine) + Azure App Insights
 #    Construcción: docker build --target production -t medscan-backend:prod .
 # ------------------------------------------------------------------------------
 FROM eclipse-temurin:25-jre-alpine AS production
 
 LABEL maintainer="MedScan AI DevOps Team" \
-      description="MedScan AI Backend REST API - Production Container"
+      description="MedScan AI Backend REST API - Production Container with Azure Application Insights"
 
 # Crear usuario y grupo de sistema sin privilegios para ejecución segura (Non-Root)
 RUN addgroup -S -g 1001 medscan && adduser -S -u 1001 -G medscan medscan
 
 WORKDIR /app
 
+# Descargar Azure Application Insights Java Agent 3.x para telemetría, métricas y APM distribuido
+ADD https://github.com/microsoft/ApplicationInsights-Java/releases/download/3.6.2/applicationinsights-agent-3.6.2.jar /app/applicationinsights-agent.jar
+RUN chown medscan:medscan /app/applicationinsights-agent.jar && chmod 644 /app/applicationinsights-agent.jar
+
 # Optimización de JVM para contenedores:
 # - UseContainerSupport: Detecta límites de CPU y Memoria asignados por Docker/K8s
 # - MaxRAMPercentage=75: Asigna hasta el 75% de la memoria del contenedor a la JVM
 # - java.security.egd: Acelera la generación de entropía segura para JWT
-ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom" \
+# - javaagent: Autoinstrumentación no intrusiva con Azure Application Insights
+ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -Djava.security.egd=file:/dev/./urandom -javaagent:/app/applicationinsights-agent.jar" \
     SPRING_PROFILES_ACTIVE=prod \
     SPRING_OUTPUT_ANSI_ENABLED=ALWAYS
 

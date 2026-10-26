@@ -29,10 +29,18 @@ public class User {
     @Column(nullable = false, updatable = false)
     private java.time.LocalDateTime createdAt = java.time.LocalDateTime.now();
 
+    private java.time.LocalDateTime lastLoginAt;
+
+    @Column(nullable = false)
+    private Boolean isLoggedIn = false;
+
     @PrePersist
     protected void onCreate() {
         if (createdAt == null) {
             createdAt = java.time.LocalDateTime.now();
+        }
+        if (isLoggedIn == null) {
+            isLoggedIn = false;
         }
     }
 }
