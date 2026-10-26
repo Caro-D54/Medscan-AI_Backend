@@ -111,6 +111,7 @@ class AuthServiceTest {
 
         when(userRepo.findByEmail("caro@medscan.com")).thenReturn(Optional.of(user));
         when(passwordEncoder.matches("secret123", "hashed")).thenReturn(true);
+        when(userRepo.save(any(User.class))).thenReturn(user);
         when(jwtService.generateToken(user)).thenReturn("jwt-token");
 
         AuthResponse response = authService.login(request);
@@ -121,6 +122,9 @@ class AuthServiceTest {
         assertThat(response.getUser().name()).isEqualTo("Carolina");
         assertThat(response.getUser().email()).isEqualTo("caro@medscan.com");
         assertThat(response.getUser().role()).isEqualTo(Role.USER);
+        assertThat(user.getIsLoggedIn()).isTrue();
+        assertThat(user.getLastLoginAt()).isNotNull();
+        verify(userRepo).save(user);
     }
 
     @Test
