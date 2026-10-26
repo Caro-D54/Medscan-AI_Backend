@@ -167,7 +167,7 @@ jobs:
       # RBAC estrictos sobre el ACR/Resource Group, sin exponer cuentas personales.
       # ------------------------------------------------------------------------
       - name: Construir y subir imagen de Producción a Azure ACR (upload_to_acr.py)
-        if: steps.semver.outputs.should_deploy == 'true' && (env.AZURE_APP_ID != '' || env.AZURE_CREDENTIALS != '')
+        if: steps.semver.outputs.should_deploy == 'true'
         env:
           AZURE_APP_ID: ${{ secrets.AZURE_APP_ID || secrets.ACR_USERNAME }}
           AZURE_PASSWORD: ${{ secrets.AZURE_PASSWORD || secrets.ACR_PASSWORD }}
@@ -187,7 +187,7 @@ jobs:
       # ------------------------------------------------------------------------
       - name: Normalizar credenciales de Service Principal para Azure
         id: azure-creds
-        if: steps.semver.outputs.should_deploy == 'true' && (secrets.AZURE_CREDENTIALS != '' || secrets.AZURE_APP_ID != '')
+        if: steps.semver.outputs.should_deploy == 'true'
         env:
           RAW_CREDS: ${{ secrets.AZURE_CREDENTIALS }}
           APP_ID: ${{ secrets.AZURE_APP_ID || secrets.ACR_USERNAME }}
@@ -223,12 +223,12 @@ jobs:
 
       - name: Iniciar sesión en Azure CLI con Service Principal (para despliegue en ACI)
         uses: azure/login@v2
-        if: steps.semver.outputs.should_deploy == 'true' && steps.azure-creds.outputs.creds != ''
+        if: steps.semver.outputs.should_deploy == 'true'
         with:
           creds: ${{ steps.azure-creds.outputs.creds }}
 
       - name: Validar registro del proveedor Microsoft.ContainerInstance en Azure
-        if: steps.semver.outputs.should_deploy == 'true' && env.AZURE_CREDENTIALS != ''
+        if: steps.semver.outputs.should_deploy == 'true'
         run: |
           echo "Verificando registro del proveedor Microsoft.ContainerInstance..."
           STATE=$(az provider show --namespace Microsoft.ContainerInstance --query registrationState -o tsv 2>/dev/null || echo "NotRegistered")
@@ -256,9 +256,7 @@ jobs:
       # ------------------------------------------------------------------------
       - name: Desplegar / Actualizar instancia en Azure Container Instances (ACI)
         uses: azure/aci-deploy@v1
-        if: steps.semver.outputs.should_deploy == 'true' && env.AZURE_CREDENTIALS != ''
-        env:
-          AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+        if: steps.semver.outputs.should_deploy == 'true'
         with:
           resource-group: ${{ secrets.AZURE_RESOURCE_GROUP || 'universidad' }}
           dns-name-label: ${{ secrets.ACI_DNS_LABEL || 'medscan-api' }}
@@ -293,7 +291,7 @@ jobs:
       # VERIFICACIÓN DE SALUD Y MÉTRICAS POST-DEPLOY (12 FACTOR APP)
       # ------------------------------------------------------------------------
       - name: Validar salud y métricas en vivo (/actuator/health y /actuator/metrics)
-        if: steps.semver.outputs.should_deploy == 'true' && env.AZURE_CREDENTIALS != ''
+        if: steps.semver.outputs.should_deploy == 'true'
         env:
           AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
         run: |
