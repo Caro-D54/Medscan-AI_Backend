@@ -10,6 +10,12 @@ on:
       - develop
   workflow_call:
   workflow_dispatch:
+    inputs:
+      force_deploy:
+        description: 'Forzar despliegue independientemente del prefijo del último commit'
+        required: false
+        type: boolean
+        default: true
 
 permissions:
   contents: write
@@ -116,6 +122,16 @@ jobs:
             SHOULD_DEPLOY="false"
             SKIP_REASON="Tipo de commit informativo/mantenimiento (doc/docs/chore). No requiere versión ni despliegue."
             echo "ℹ️ ${SKIP_REASON}"
+          fi
+
+          # Soporte para disparo manual (workflow_dispatch) con force_deploy=true
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.force_deploy }}" = "true" ]; then
+            SHOULD_DEPLOY="true"
+            if [ "${NEW_VERSION}" = "${LATEST_TAG}" ]; then
+              Z=$((Z + 1))
+              NEW_VERSION="v${X}.${Y}.${Z}"
+            fi
+            echo "⚡ Disparo manual (workflow_dispatch) con force_deploy=true -> Despliegue forzado a versión: ${NEW_VERSION}"
           fi
 
           COMMIT_REF="${{ github.event.workflow_run.head_sha || github.sha }}"
@@ -292,6 +308,7 @@ jobs:
           echo "- **URL Base (para Postman):** \`${BASE_URL}\`" >> $GITHUB_STEP_SUMMARY
           echo "- **Health Check:** \`${BASE_URL}/actuator/health\`" >> $GITHUB_STEP_SUMMARY
           echo "- **Métricas (12-Factor):** \`${BASE_URL}/actuator/metrics\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Azure Application Insights (APM):** Telemetría activa en vivo (Trazas distribuidas, SQL, HTTP y métricas JVM)" >> $GITHUB_STEP_SUMMARY
 
           echo "1. Verificando estado de salud (/actuator/health)..."
           curl --retry 6 --retry-delay 10 --fail "${BASE_URL}/actuator/health" || true
