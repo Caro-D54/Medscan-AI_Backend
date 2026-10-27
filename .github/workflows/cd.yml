@@ -252,6 +252,80 @@ jobs:
           fi
 
       # ------------------------------------------------------------------------
+      # SANITIZACIÓN Y PREPARACIÓN DEFENSIVA DE VARIABLES DE ENTORNO PARA ACI
+      # Azure Container Instances rechaza variables con nombres inválidos (ej. vacías o con '=').
+      # Este paso filtra variables no configuradas y entrecomilla cada valor para que azure/aci-deploy
+      # no rompa nombres de variables si los valores contienen espacios o signos '='.
+      # ------------------------------------------------------------------------
+      - name: Preparar y sanitizar variables de entorno para Azure ACI
+        id: prepare-aci-env
+        if: steps.semver.outputs.should_deploy == 'true'
+        env:
+          SPRING_DATASOURCE_URL: ${{ secrets.SPRING_DATASOURCE_URL }}
+          SPRING_DATASOURCE_USERNAME: ${{ secrets.SPRING_DATASOURCE_USERNAME }}
+          SPRING_DATASOURCE_PASSWORD: ${{ secrets.SPRING_DATASOURCE_PASSWORD }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          JWT_EXPIRATION_MS: ${{ secrets.JWT_EXPIRATION_MS }}
+          SCAN_OPENAI_API_KEY: ${{ secrets.SCAN_OPENAI_API_KEY }}
+          SCAN_OPENAI_MODEL: ${{ secrets.SCAN_OPENAI_MODEL }}
+          SCAN_OPENAI_URL: ${{ secrets.SCAN_OPENAI_URL }}
+          NOTIFICATION_EXPO_URL: ${{ secrets.NOTIFICATION_EXPO_URL }}
+          NOTIFICATION_REMINDER_DELAY_MS: ${{ secrets.NOTIFICATION_REMINDER_DELAY_MS }}
+          NOTIFICATION_REMINDER_ADVANCE_MINUTES: ${{ secrets.NOTIFICATION_REMINDER_ADVANCE_MINUTES }}
+          APPLICATIONINSIGHTS_CONNECTION_STRING: ${{ secrets.APPLICATIONINSIGHTS_CONNECTION_STRING }}
+        run: |
+          # 1. Variables de entorno estándar (valores seguros y entrecomillados)
+          ENV_LIST="SPRING_PROFILES_ACTIVE=\"prod\" SERVER_PORT=\"8080\" APPLICATIONINSIGHTS_ROLE_NAME=\"medscan-backend-api\""
+
+          if [ -n "${SPRING_DATASOURCE_URL}" ]; then
+            ENV_LIST="${ENV_LIST} SPRING_DATASOURCE_URL=\"${SPRING_DATASOURCE_URL}\""
+          fi
+          if [ -n "${SPRING_DATASOURCE_USERNAME}" ]; then
+            ENV_LIST="${ENV_LIST} SPRING_DATASOURCE_USERNAME=\"${SPRING_DATASOURCE_USERNAME}\""
+          fi
+          if [ -n "${JWT_SECRET}" ]; then
+            ENV_LIST="${ENV_LIST} JWT_SECRET=\"${JWT_SECRET}\""
+          fi
+          if [ -n "${JWT_EXPIRATION_MS}" ]; then
+            ENV_LIST="${ENV_LIST} JWT_EXPIRATION_MS=\"${JWT_EXPIRATION_MS}\""
+          fi
+          if [ -n "${SCAN_OPENAI_API_KEY}" ]; then
+            ENV_LIST="${ENV_LIST} SCAN_OPENAI_API_KEY=\"${SCAN_OPENAI_API_KEY}\""
+          fi
+          if [ -n "${SCAN_OPENAI_MODEL}" ]; then
+            ENV_LIST="${ENV_LIST} SCAN_OPENAI_MODEL=\"${SCAN_OPENAI_MODEL}\""
+          fi
+          if [ -n "${SCAN_OPENAI_URL}" ]; then
+            ENV_LIST="${ENV_LIST} SCAN_OPENAI_URL=\"${SCAN_OPENAI_URL}\""
+          fi
+          if [ -n "${NOTIFICATION_EXPO_URL}" ]; then
+            ENV_LIST="${ENV_LIST} NOTIFICATION_EXPO_URL=\"${NOTIFICATION_EXPO_URL}\""
+          fi
+          if [ -n "${NOTIFICATION_REMINDER_DELAY_MS}" ]; then
+            ENV_LIST="${ENV_LIST} NOTIFICATION_REMINDER_DELAY_MS=\"${NOTIFICATION_REMINDER_DELAY_MS}\""
+          fi
+          if [ -n "${NOTIFICATION_REMINDER_ADVANCE_MINUTES}" ]; then
+            ENV_LIST="${ENV_LIST} NOTIFICATION_REMINDER_ADVANCE_MINUTES=\"${NOTIFICATION_REMINDER_ADVANCE_MINUTES}\""
+          fi
+
+          # 2. Variables de entorno seguras (contraseñas y connection strings)
+          SEC_LIST=""
+          if [ -n "${SPRING_DATASOURCE_PASSWORD}" ]; then
+            SEC_LIST="SPRING_DATASOURCE_PASSWORD=\"${SPRING_DATASOURCE_PASSWORD}\""
+          fi
+          if [ -n "${APPLICATIONINSIGHTS_CONNECTION_STRING}" ]; then
+            if [ -n "${SEC_LIST}" ]; then
+              SEC_LIST="${SEC_LIST} APPLICATIONINSIGHTS_CONNECTION_STRING=\"${APPLICATIONINSIGHTS_CONNECTION_STRING}\""
+            else
+              SEC_LIST="APPLICATIONINSIGHTS_CONNECTION_STRING=\"${APPLICATIONINSIGHTS_CONNECTION_STRING}\""
+            fi
+          fi
+
+          echo "env_vars=${ENV_LIST}" >> $GITHUB_OUTPUT
+          echo "secure_env_vars=${SEC_LIST}" >> $GITHUB_OUTPUT
+          echo "Variables de entorno para ACI formateadas y sanitizadas exitosamente."
+
+      # ------------------------------------------------------------------------
       # DESPLIEGUE CONTINUO EN AZURE CONTAINER INSTANCES (ACI)
       # ------------------------------------------------------------------------
       - name: Desplegar / Actualizar instancia en Azure Container Instances (ACI)
@@ -269,23 +343,8 @@ jobs:
           ports: 8080
           cpu: 1
           memory: 1.5
-          environment-variables: |
-            SPRING_PROFILES_ACTIVE=prod
-            SERVER_PORT=8080
-            SPRING_DATASOURCE_URL=${{ secrets.SPRING_DATASOURCE_URL }}
-            SPRING_DATASOURCE_USERNAME=${{ secrets.SPRING_DATASOURCE_USERNAME }}
-            JWT_SECRET=${{ secrets.JWT_SECRET }}
-            JWT_EXPIRATION_MS=${{ secrets.JWT_EXPIRATION_MS }}
-            SCAN_OPENAI_API_KEY=${{ secrets.SCAN_OPENAI_API_KEY }}
-            SCAN_OPENAI_MODEL=${{ secrets.SCAN_OPENAI_MODEL }}
-            SCAN_OPENAI_URL=${{ secrets.SCAN_OPENAI_URL }}
-            NOTIFICATION_EXPO_URL=${{ secrets.NOTIFICATION_EXPO_URL }}
-            NOTIFICATION_REMINDER_DELAY_MS=${{ secrets.NOTIFICATION_REMINDER_DELAY_MS }}
-            NOTIFICATION_REMINDER_ADVANCE_MINUTES=${{ secrets.NOTIFICATION_REMINDER_ADVANCE_MINUTES }}
-            APPLICATIONINSIGHTS_ROLE_NAME=medscan-backend-api
-          secure-environment-variables: |
-            SPRING_DATASOURCE_PASSWORD=${{ secrets.SPRING_DATASOURCE_PASSWORD }}
-            APPLICATIONINSIGHTS_CONNECTION_STRING=${{ secrets.APPLICATIONINSIGHTS_CONNECTION_STRING }}
+          environment-variables: ${{ steps.prepare-aci-env.outputs.env_vars }}
+          secure-environment-variables: ${{ steps.prepare-aci-env.outputs.secure_env_vars }}
 
       # ------------------------------------------------------------------------
       # VERIFICACIÓN DE SALUD Y MÉTRICAS POST-DEPLOY (12 FACTOR APP)
