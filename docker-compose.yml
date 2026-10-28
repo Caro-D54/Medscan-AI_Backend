@@ -55,11 +55,14 @@ services:
       JWT_SECRET: ${JWT_SECRET:-medscan_ai_super_secret_jwt_key_at_least_32_chars_long}
       JWT_EXPIRATION_MS: ${JWT_EXPIRATION_MS:-86400000}
 
-      # Integración con IA (OpenAI Vision / Chat)
+      # Integración con IA (OpenAI Vision / Gemini / OCR)
       SCAN_OPENAI_API_KEY: ${SCAN_OPENAI_API_KEY:-}
       SCAN_OPENAI_MODEL: ${SCAN_OPENAI_MODEL:-gpt-4o-mini}
       SCAN_OPENAI_URL: ${SCAN_OPENAI_URL:-https://api.openai.com/v1/chat/completions}
       SCAN_OPENAI_TIMEOUT_MS: ${SCAN_OPENAI_TIMEOUT_MS:-15000}
+      SCAN_GEMINI_API_KEY: ${SCAN_GEMINI_API_KEY:-}
+      SCAN_GEMINI_MODEL: ${SCAN_GEMINI_MODEL:-gemini-2.0-flash}
+      SCAN_OCR_API_KEY: ${SCAN_OCR_API_KEY:-K88856237488957}
 
       # Notificaciones Push (Expo) y Planificador de Recordatorios
       NOTIFICATION_EXPO_URL: ${NOTIFICATION_EXPO_URL:-https://exp.host/--/api/v2/push/send}

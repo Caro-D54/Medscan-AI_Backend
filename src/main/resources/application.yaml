@@ -4,6 +4,13 @@ spring:
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:dev}
 
+  # Configuración para subida de fotos de medicamentos desde cámaras móviles
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 25MB
+      max-request-size: 25MB
+
   # Configuración común de Jackson
   jackson:
     serialization:
@@ -56,6 +63,15 @@ app:
       model: ${SCAN_OPENAI_MODEL:gpt-4o-mini}
       url: ${SCAN_OPENAI_URL:https://api.openai.com/v1/chat/completions}
       timeout-ms: ${SCAN_OPENAI_TIMEOUT_MS:15000}
+    gemini:
+      api-key: ${SCAN_GEMINI_API_KEY:}
+      model: ${SCAN_GEMINI_MODEL:gemini-2.0-flash}
+      url: ${SCAN_GEMINI_URL:https://generativelanguage.googleapis.com/v1beta/models}
+      timeout-ms: ${SCAN_GEMINI_TIMEOUT_MS:15000}
+    ocr:
+      api-key: ${SCAN_OCR_API_KEY:K88856237488957}
+      url: ${SCAN_OCR_URL:https://api.ocr.space/parse/image}
+      timeout-ms: ${SCAN_OCR_TIMEOUT_MS:15000}
   notification:
     expo:
       url: ${NOTIFICATION_EXPO_URL:https://exp.host/--/api/v2/push/send}

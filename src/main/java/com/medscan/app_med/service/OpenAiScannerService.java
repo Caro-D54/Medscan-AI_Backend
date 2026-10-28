@@ -3,10 +3,15 @@ package com.medscan.app_med.service;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
 
 import java.util.Base64;
@@ -17,6 +22,8 @@ import java.util.Map;
 @Service
 public class OpenAiScannerService implements ScannerService {
 
+    private static final Logger log = LoggerFactory.getLogger(OpenAiScannerService.class);
+
     private static final String EXTRACTION_PROMPT =
             "Extrae del prospecto o receta los datos del medicamento y responde solo con JSON con los campos: "
                     + "brandName, activeIngredient, dosage, frequency.";
@@ -26,19 +33,34 @@ public class OpenAiScannerService implements ScannerService {
     private final String apiKey;
     private final String model;
     private final String url;
+    private final String geminiApiKey;
+    private final String geminiModel;
+    private final String geminiUrl;
+    private final String ocrApiKey;
+    private final String ocrUrl;
 
-    @org.springframework.beans.factory.annotation.Autowired
+    @Autowired
     public OpenAiScannerService(ObjectMapper objectMapper,
                                 RestClient.Builder restClientBuilder,
                                 @Value("${app.scan.openai.api-key:}") String apiKey,
                                 @Value("${app.scan.openai.model:gpt-4o-mini}") String model,
                                 @Value("${app.scan.openai.url:https://api.openai.com/v1/chat/completions}") String url,
+                                @Value("${app.scan.gemini.api-key:}") String geminiApiKey,
+                                @Value("${app.scan.gemini.model:gemini-2.0-flash}") String geminiModel,
+                                @Value("${app.scan.gemini.url:https://generativelanguage.googleapis.com/v1beta/models}") String geminiUrl,
+                                @Value("${app.scan.ocr.api-key:K88856237488957}") String ocrApiKey,
+                                @Value("${app.scan.ocr.url:https://api.ocr.space/parse/image}") String ocrUrl,
                                 @Value("${app.scan.openai.timeout-ms:15000}") int timeoutMs) {
 
         this.objectMapper = objectMapper;
-        this.apiKey = apiKey;
+        this.apiKey = apiKey != null ? apiKey.trim() : "";
         this.model = model;
         this.url = url;
+        this.geminiApiKey = geminiApiKey != null ? geminiApiKey.trim() : "";
+        this.geminiModel = geminiModel != null && !geminiModel.isBlank() ? geminiModel : "gemini-2.0-flash";
+        this.geminiUrl = geminiUrl;
+        this.ocrApiKey = ocrApiKey != null && !ocrApiKey.isBlank() ? ocrApiKey : "K88856237488957";
+        this.ocrUrl = ocrUrl != null && !ocrUrl.isBlank() ? ocrUrl : "https://api.ocr.space/parse/image";
 
         org.springframework.http.client.SimpleClientHttpRequestFactory requestFactory =
                 new org.springframework.http.client.SimpleClientHttpRequestFactory();
@@ -52,7 +74,7 @@ public class OpenAiScannerService implements ScannerService {
                                 String apiKey,
                                 String model,
                                 String url) {
-        this(objectMapper, RestClient.builder(), apiKey, model, url, 15000);
+        this(objectMapper, RestClient.builder(), apiKey, model, url, "", "gemini-2.0-flash", "", "", "", 15000);
     }
 
     @Override
@@ -60,13 +82,110 @@ public class OpenAiScannerService implements ScannerService {
         if (imageBytes == null || imageBytes.length == 0) {
             throw new ScanProcessingException("La imagen recibida está vacía");
         }
-        if (apiKey == null || apiKey.isBlank()) {
-            throw new ScanProcessingException("La API key de OpenAI no está configurada");
+
+        String effectiveContentType = (contentType != null && !contentType.isBlank()) ? contentType : "image/jpeg";
+
+        // 1. Intentar con OpenAI Vision si la clave está configurada
+        if (!apiKey.isBlank()) {
+            try {
+                String payload = buildOpenAiRequest(imageBytes, effectiveContentType);
+                String response = callOpenAi(payload);
+                return parseResponse(response);
+            } catch (Exception ex) {
+                log.warn("Error en el escaneo con OpenAI ({}), intentando fallback con IA/OCR...", ex.getMessage());
+            }
         }
 
-        String payload = buildRequest(imageBytes, contentType);
-        String response = callOpenAi(payload);
-        return parseResponse(response);
+        // 2. Intentar con Google Gemini Vision si la clave está configurada
+        if (!geminiApiKey.isBlank()) {
+            try {
+                return callGemini(imageBytes, effectiveContentType);
+            } catch (Exception ex) {
+                log.warn("Error en el escaneo con Gemini ({}), intentando fallback con OCR Space...", ex.getMessage());
+            }
+        }
+
+        // 3. Fallback con OCR Space + Parser Farmacéutico Inteligente
+        if (!ocrApiKey.isBlank() && !ocrApiKey.equals("disabled")) {
+            try {
+                return callOcrSpace(imageBytes, effectiveContentType);
+            } catch (Exception ex) {
+                log.warn("Error en el escaneo con OCR Space ({})", ex.getMessage());
+            }
+        }
+
+        // Si ninguna API estaba configurada o todas fallaron
+        if (apiKey.isBlank() && geminiApiKey.isBlank()) {
+            throw new ScanProcessingException("La API key de escaneo no está configurada");
+        }
+
+        throw new ScanProcessingException("No se pudo procesar la imagen del medicamento con los servicios disponibles");
+    }
+
+    private ScannedMedication callGemini(byte[] imageBytes, String contentType) {
+        String base64Image = Base64.getEncoder().encodeToString(imageBytes);
+        String endpoint = String.format("%s/%s:generateContent?key=%s",
+                geminiUrl.replaceAll("/+$", ""), geminiModel, geminiApiKey);
+
+        Map<String, Object> body = Map.of(
+                "contents", List.of(Map.of(
+                        "parts", List.of(
+                                Map.of("text", EXTRACTION_PROMPT),
+                                Map.of("inline_data", Map.of(
+                                        "mime_type", contentType,
+                                        "data", base64Image
+                                ))
+                        )
+                )),
+                "generationConfig", Map.of("response_mime_type", "application/json")
+        );
+
+        String jsonPayload = writeJson(body);
+        String response = restClient.post()
+                .uri(endpoint)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(jsonPayload)
+                .retrieve()
+                .body(String.class);
+
+        JsonNode root = readTree(response);
+        JsonNode textNode = root.path("candidates").path(0).path("content").path("parts").path(0).path("text");
+        String content = textNode.asText(null);
+        if (content == null || content.isBlank()) {
+            throw new ScanProcessingException("Gemini no devolvió contenido extraído");
+        }
+        return parseMedicationContent(content);
+    }
+
+    private ScannedMedication callOcrSpace(byte[] imageBytes, String contentType) {
+        String base64Image = Base64.getEncoder().encodeToString(imageBytes);
+        String dataUrl = "data:" + contentType + ";base64," + base64Image;
+
+        MultiValueMap<String, String> formData = new LinkedMultiValueMap<>();
+        formData.add("apikey", ocrApiKey);
+        formData.add("base64Image", dataUrl);
+        formData.add("language", "spa");
+        formData.add("isOverlayRequired", "false");
+        formData.add("scale", "true");
+        formData.add("OCREngine", "2");
+
+        String response = restClient.post()
+                .uri(ocrUrl)
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .body(formData)
+                .retrieve()
+                .body(String.class);
+
+        JsonNode root = readTree(response);
+        JsonNode parsedResults = root.path("ParsedResults");
+        if (!parsedResults.isArray() || parsedResults.isEmpty()) {
+            throw new ScanProcessingException("OCR Space no reconoció texto en la imagen");
+        }
+
+        String fullText = parsedResults.get(0).path("ParsedText").asText("");
+        log.info("Texto extraído por OCR Space: {}", fullText.replace("\n", " ").trim());
+
+        return MedicationTextExtractor.extract(fullText);
     }
 
     public ScannedMedication parseResponse(String responseJson) {
@@ -106,7 +225,7 @@ public class OpenAiScannerService implements ScannerService {
         return trimmed.trim();
     }
 
-    private String buildRequest(byte[] imageBytes, String contentType) {
+    private String buildOpenAiRequest(byte[] imageBytes, String contentType) {
         String dataUrl = buildDataUrl(imageBytes, contentType);
 
         Map<String, Object> body = new HashMap<>();
@@ -140,7 +259,6 @@ public class OpenAiScannerService implements ScannerService {
         }
     }
 
-
     private JsonNode readTree(String json) {
         try {
             return objectMapper.readTree(json);
@@ -149,11 +267,11 @@ public class OpenAiScannerService implements ScannerService {
         }
     }
 
-    private String writeJson(Object value) {
+    private String writeJson(Object body) {
         try {
-            return objectMapper.writeValueAsString(value);
+            return objectMapper.writeValueAsString(body);
         } catch (JsonProcessingException e) {
-            throw new ScanProcessingException("No se pudo construir la petición de escaneo", e);
+            throw new ScanProcessingException("Error serializando petición para el servicio de escaneo", e);
         }
     }
 }
