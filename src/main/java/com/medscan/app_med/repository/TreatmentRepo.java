@@ -1,5 +1,6 @@
 package com.medscan.app_med.repository;
 
+import com.medscan.app_med.model.Medicament;
 import com.medscan.app_med.model.Treatment;
 import com.medscan.app_med.model.User;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -18,4 +19,6 @@ public interface TreatmentRepo extends JpaRepository<Treatment, Long> {
 
     @Query("SELECT DISTINCT t FROM Treatment t JOIN FETCH t.medicament LEFT JOIN FETCH t.doses WHERE t.user = :user ORDER BY t.startDate ASC, t.id ASC")
     List<Treatment> findAllByUser(@Param("user") User user);
+
+    List<Treatment> findByMedicament(Medicament medicament);
 }

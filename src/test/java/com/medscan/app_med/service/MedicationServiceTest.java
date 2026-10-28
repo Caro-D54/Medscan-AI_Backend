@@ -3,6 +3,7 @@ package com.medscan.app_med.service;
 import com.medscan.app_med.model.Medicament;
 import com.medscan.app_med.model.User;
 import com.medscan.app_med.repository.MedicamentRepo;
+import com.medscan.app_med.repository.TreatmentRepo;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -30,6 +31,9 @@ class MedicationServiceTest {
 
     @Mock
     private MedicamentRepo medicamentRepo;
+
+    @Mock
+    private TreatmentRepo treatmentRepo;
 
     @InjectMocks
     private MedicationService medicationService;
@@ -130,9 +134,11 @@ class MedicationServiceTest {
         Medicament existing = new Medicament();
         existing.setId(id);
         when(medicamentRepo.findByIdAndUser(id, currentUser)).thenReturn(Optional.of(existing));
+        when(treatmentRepo.findByMedicament(existing)).thenReturn(List.of());
 
         medicationService.deleteMedication(id);
 
+        verify(treatmentRepo).deleteAll(List.of());
         verify(medicamentRepo).delete(existing);
     }
 

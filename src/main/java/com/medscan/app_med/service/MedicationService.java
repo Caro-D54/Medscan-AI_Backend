@@ -1,21 +1,28 @@
 package com.medscan.app_med.service;
 
 import com.medscan.app_med.model.Medicament;
+import com.medscan.app_med.model.Treatment;
 import com.medscan.app_med.model.User;
 import com.medscan.app_med.repository.MedicamentRepo;
+import com.medscan.app_med.repository.TreatmentRepo;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 @Service
 public class MedicationService {
 
     private final MedicamentRepo medicamentRepo;
+    private final TreatmentRepo treatmentRepo;
 
-    public MedicationService(MedicamentRepo medicamentRepo) {
+    public MedicationService(MedicamentRepo medicamentRepo, TreatmentRepo treatmentRepo) {
         this.medicamentRepo = medicamentRepo;
+        this.treatmentRepo = treatmentRepo;
     }
 
     public Page<Medicament> getMedications(String nameFilter, Pageable pageable) {
@@ -51,9 +58,12 @@ public class MedicationService {
         return medicamentRepo.save(existing);
     }
 
+    @Transactional
     public void deleteMedication(Long id) {
         Medicament existing = medicamentRepo.findByIdAndUser(id, currentUser())
                 .orElseThrow(MedicationNotFoundException::new);
+        List<Treatment> treatments = treatmentRepo.findByMedicament(existing);
+        treatmentRepo.deleteAll(treatments);
         medicamentRepo.delete(existing);
     }
 
